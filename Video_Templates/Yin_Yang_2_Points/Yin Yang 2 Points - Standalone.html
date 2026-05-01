@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Yin Yang 2 Points</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@700&f[]=inter@700,800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0a0a0a;
+      font-family: 'Inter', 'Satoshi', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    // ─── Inline SVG icons (recoloured at render time) ────────────────────────
+    const ICON_SVGS = {
+      rocket: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Capa_1" x="0px" y="0px" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve" width="512" height="512">
+<g>
+	<path style="fill:#33CCCC;" d="M126.93,385.772c-0.001-0.001-0.002-0.001-0.003-0.002c10.692,10.692,10.692,28.089,0.001,38.78   c-1.58,1.58-3.346,2.964-5.251,4.114c-1.154,0.721-2.515,1.313-3.795,1.94L39.2,472.785c0.779-1.516,42.409-76.868,43.211-78.609   c1.375-3.146,3.304-5.975,5.734-8.405c5.346-5.346,12.368-8.02,19.391-8.02s14.045,2.674,19.391,8.02   c-0.001-0.001-0.001-0.002-0.002-0.002L97.87,356.713c-9.27,1.835-18.112,6.332-25.281,13.5   c-4.254,4.254-7.658,9.187-10.123,14.667L2.009,494.733c-2.35,4.269-1.611,9.574,1.816,13.039c2.119,2.143,4.954,3.266,7.824,3.265   c1.771,0,3.556-0.427,5.194-1.306l111.088-59.552c5.458-2.466,10.323-5.852,14.553-10.071c7.169-7.169,11.666-16.011,13.501-25.281   L126.93,385.772z"/>
+	<g>
+		<path d="M323.271,248.833c-31.619,0.655-60.069-27.089-59.435-59.407c-0.215-52.53,64.383-79.275,101.462-42.025    c23.055,22.122,23.058,61.931,0,84.053h0C353.711,243.04,338.491,248.833,323.271,248.833z M323.271,152.009    c-19.913-0.413-37.835,17.064-37.435,37.417c0,9.999,3.894,19.4,10.965,26.47c23.355,23.46,64.042,6.616,63.905-26.471    C361.103,169.074,343.186,151.595,323.271,152.009z"/>
+	</g>
+	<path d="M496.71,106.959c15.274-54.813,15.297-94.104,15.291-95.75c-0.012-2.992-1.243-5.852-3.409-7.917s-5.081-3.155-8.07-3.028   c-56.673,2.474-110.941,15.586-161.296,38.973c-61.756,29.233-114.115,69.425-156.166,125.236l-90.372-4.394   c-3.103-0.158-6.119,1.016-8.312,3.209L3.222,244.44c-2.847,2.847-3.911,7.021-2.774,10.884c1.137,3.862,4.293,6.795,8.228,7.646   l99.484,21.512c-14.936,27.818-24.272,47.564-24.396,47.827c-1.979,4.198-1.11,9.187,2.172,12.469l40.99,40.99   c0.001,0.001,0.001,0.002,0.002,0.002s0.002,0.001,0.003,0.002l41.844,41.844c3.449,3.451,8.751,4.198,12.995,1.906   c2.137-1.151,20.414-11.026,45.614-25.482l21.42,99.057c1.67,8.378,12.561,11.609,18.53,5.453l81.152-81.152   c2.194-2.194,3.359-5.213,3.209-8.312l-4.392-90.342C426.697,272.867,472.976,189.197,496.71,106.959z M475.31,101.795   c-3.76,13.4-8.729,28.53-15.276,44.706l-94.675-94.675c39.285-16.083,80.907-25.774,124.108-28.889   C488.388,38.084,485.134,66.781,475.31,101.795z M96.485,182.29l71.203,3.462c-15.358,22.11-33.103,51.02-48.496,78.607   l-86.148-18.628L96.485,182.29z M127.483,295.067l37.295,37.296l-30.072,30.073l-27.68-27.68   C110.927,326.817,118.052,312.617,127.483,295.067z M178.508,406.237l-28.245-28.245l30.072-30.072l36.661,36.661   C200.16,394.255,186.378,401.91,178.508,406.237z M329.482,415.287l-63.441,63.441l-18.659-86.292   c24.702-14.5,52.983-31.746,78.61-48.939L329.482,415.287z M372.283,280.145c-26.59,26.591-87.706,64.864-135.607,93.003   l-40.785-40.785l53.012-53.012c4.296-4.296,4.295-11.261,0-15.557c-4.296-4.295-11.261-4.295-15.557,0l-53.012,53.012   l-41.829-41.83c24.738-44.154,59.554-100.069,94.047-134.562c32.69-32.69,70.116-59.236,111.282-78.999l106.728,106.727   C433.548,204.256,408.651,243.777,372.283,280.145z"/>
+</g>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</svg>`,
+      award:  `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Capa_1" x="0px" y="0px" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve" width="512" height="512">
+<g id="_x3C_Group_x3E__10_">
+	<path d="M470.502,0H41.498C18.616,0,0,18.616,0,41.498v23.233c0,36.674,12.617,72.642,35.526,101.277   c19.049,23.812,46.162,42.466,76.347,52.527l17.666,5.889c18.72,31.217,48.779,55.091,84.963,65.717v26.854   c0,10.751-8.747,19.498-19.498,19.498c-22.882,0-41.498,18.616-41.498,41.498v19.497h-19.498c-6.075,0-11,4.925-11,11V490h-19.497   c-6.075,0-11,4.925-11,11s4.925,11,11,11h304.979c6.075,0,11-4.925,11-11s-4.925-11-11-11h-19.497v-81.511c0-6.075-4.925-11-11-11   h-19.498v-19.497c0-22.882-18.616-41.498-41.498-41.498c-10.751,0-19.498-8.747-19.498-19.498v-26.854   c36.156-10.618,66.197-34.464,84.92-65.645l18.583-5.915c0.048-0.015,0.096-0.03,0.143-0.046   c29.715-9.905,55.764-28.068,75.33-52.526C499.383,137.373,512,101.405,512,64.731V41.498C512,18.616,493.384,0,470.502,0z    M52.706,152.266C32.905,127.516,22,96.429,22,64.731V41.498C22,30.747,30.747,22,41.498,22h52.167l15.939,143.451   c1.208,10.87,3.618,21.401,7.088,31.459C91.348,188.022,68.687,172.243,52.706,152.266z M366.992,490H145.008v-70.511h221.984V490z    M284.031,270.935c-4.994,1.148-8.533,5.595-8.533,10.72v35.342c0,22.882,18.616,41.498,41.498,41.498   c10.751,0,19.498,8.747,19.498,19.498v19.497H175.506v-19.497c0-10.751,8.747-19.498,19.498-19.498   c22.882,0,41.498-18.616,41.498-41.498v-35.342c0-5.125-3.539-9.571-8.533-10.72c-51.874-11.936-90.654-55.302-96.499-107.913   L115.801,22h280.398L380.53,163.021C374.686,215.633,335.905,258.999,284.031,270.935z M490,64.731   c0,31.697-10.905,62.784-30.706,87.534c-16.693,20.866-38.85,36.419-64.12,45.051c3.545-10.179,5.998-20.85,7.221-31.866   L418.335,22h52.167C481.253,22,490,30.747,490,41.498V64.731z"/>
+	<g>
+		<path style="fill:#33CCCC;" d="M293.696,196.273c-1.716,0-3.438-0.4-5.022-1.214L256,178.288l-32.674,16.771    c-3.716,1.907-8.189,1.546-11.551-0.932c-3.36-2.478-5.029-6.645-4.307-10.758l6.179-35.178l-26.227-24.959    c-3.056-2.908-4.179-7.307-2.894-11.323c1.286-4.017,4.756-6.944,8.932-7.536l36.465-5.175l16.259-32.166    c1.872-3.702,5.668-6.037,9.817-6.037s7.945,2.335,9.817,6.037l16.259,32.166l36.465,5.175c4.176,0.592,7.646,3.52,8.932,7.536    c1.285,4.017,0.162,8.415-2.894,11.323l-26.227,24.959l6.179,35.178c0.723,4.113-0.946,8.28-4.307,10.758    C298.297,195.549,296.003,196.273,293.696,196.273z M256,154.924c1.724,0,3.446,0.404,5.023,1.214l18.012,9.245l-3.371-19.19    c-0.638-3.627,0.583-7.333,3.251-9.872l14.036-13.357l-19.647-2.788c-3.561-0.505-6.649-2.719-8.272-5.929L256,96.38    l-9.031,17.866c-1.623,3.21-4.712,5.424-8.272,5.929l-19.647,2.788l14.036,13.357c2.668,2.539,3.889,6.245,3.251,9.872    l-3.371,19.19l18.012-9.245C252.554,155.328,254.277,154.924,256,154.924z"/>
+	</g>
+</g>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</svg>`,
+      laptop: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Capa_1" x="0px" y="0px" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve" width="512" height="512">
+<g>
+	<path d="M501,356.737h-24.58V82.161c0-6.075-4.925-11-11-11H46.58c-6.075,0-11,4.925-11,11v274.576H11c-6.075,0-11,4.925-11,11   v21.378c0,28.521,22.987,51.724,51.242,51.724h409.516c28.255,0,51.242-23.203,51.242-51.724v-21.378   C512,361.662,507.075,356.737,501,356.737z M57.58,93.161H454.42v263.576H341.516c-6.584-0.036-11.554,5.743-11,12.217h-149.03   c0.554-6.474-4.417-12.254-11-12.217H57.58V93.161z M490,389.115c0,16.39-13.118,29.724-29.242,29.724H51.242   C35.118,418.839,22,405.505,22,389.115v-10.378h137.486c-0.554,6.474,4.417,12.254,11,12.217h171.03   c6.584,0.036,11.554-5.743,11-12.217H490V389.115z"/>
+	<g>
+		<path style="fill:#33CCCC;" d="M109.609,314.227c-2.815,0-5.63-1.074-7.778-3.222c-4.296-4.296-4.296-11.261,0-15.557    l82.345-82.345c2.1-2.099,4.96-3.258,7.927-3.221c2.969,0.04,5.795,1.278,7.837,3.434l56.397,59.53L394.737,138.77    c4.363-4.229,11.328-4.117,15.554,0.247c4.228,4.363,4.117,11.327-0.247,15.554l-146.39,141.816    c-2.111,2.045-4.936,3.146-7.89,3.097c-2.938-0.063-5.729-1.299-7.75-3.432l-56.274-59.4l-74.354,74.354    C115.239,313.153,112.424,314.227,109.609,314.227z"/>
+	</g>
+</g>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</svg>`,
+      goal:   `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Capa_1" x="0px" y="0px" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve" width="512" height="512">
+<g>
+	<g>
+		<path style="fill:#33CCCC;" d="M98.788,365.4v17.755c0,25.594,20.822,46.416,46.416,46.416s46.416-20.822,46.416-46.416v-64.293    c0-9.257,7.531-16.787,16.788-16.787s16.788,7.53,16.788,16.787v4.904c0,24.692,20.089,44.781,44.781,44.781    c15.139,0,28.537-7.559,36.646-19.093l-13.877-25.275c-0.222,12.371-10.347,22.368-22.77,22.368    c-12.562,0-22.781-10.22-22.781-22.781v-4.904c0-21.388-17.4-38.787-38.788-38.787s-38.788,17.399-38.788,38.787v64.293    c0,13.463-10.953,24.416-24.416,24.416s-24.416-10.953-24.416-24.416v-57.508L98.788,365.4z"/>
+		<path style="fill:#33CCCC;" d="M313.44,316.16c-0.01-0.017-0.019-0.035-0.029-0.052L313.44,316.16z"/>
+	</g>
+	<path d="M510.582,495.761L357.143,201.435c-8.591-18.503-35.637-18.786-44.566-0.474l-30.9,57.344l-52.524-95.667   c-0.05-0.091-0.102-0.182-0.154-0.271c-2.538-4.327-6.186-7.676-10.479-9.781v-52.98l63.37,0.123l-7.47,26.831   c-0.923,3.312-0.243,6.866,1.837,9.604c2.08,2.738,5.321,4.347,8.76,4.347h157.377c4.78,0,9.014-3.088,10.474-7.64   c1.461-4.552-0.186-9.525-4.073-12.307l-37.723-26.985l38.801-35.969c3.318-3.076,4.414-7.871,2.762-12.084   s-5.715-6.983-10.24-6.983h-92.777l6.711-24.65c0.9-3.308,0.208-6.846-1.873-9.568C352.373,1.598,349.142,0,345.714,0H207.52   c-6.075,0-11,4.925-11,11v77.562c0,0.014,0,0.028,0,0.042v63.967c-4.28,2.092-7.923,5.419-10.467,9.721   c-0.053,0.09-0.105,0.181-0.156,0.272L1.548,495.674c-1.886,3.407-1.829,7.558,0.148,10.912S7.278,512,11.172,512l489.656-0.154   c3.846,0,7.412-2.008,9.405-5.296C512.228,503.262,512.36,499.171,510.582,495.761z M414.347,60.54l-28.122,26.069   c-2.424,2.247-3.709,5.465-3.499,8.763c0.209,3.299,1.89,6.328,4.577,8.251l20.808,14.885H299.498l5.216-18.737l19.795,0.038   c0.008,0,0.015,0,0.021,0c4.962,0,9.311-3.322,10.613-8.11l8.483-31.159H414.347z M218.52,22H331.32L316.13,77.793l-97.61-0.188V22   z M29.832,490l175.213-316.6c1.36-1.856,3.571-1.854,4.924,0.009L383.784,490H29.832z M408.797,489.846L294.289,281.277   l37.753-70.061c1.065-2.619,4.527-2.587,5.497,0.203l145.15,278.427H408.797z"/>
+</g>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</svg>`,
+    };
+
+    // ─── Easing + helpers ────────────────────────────────────────────────────
+    const Easing = {
+      linear:        t => t,
+      easeOutQuad:   t => t * (2 - t),
+      easeOutCubic:  t => 1 - Math.pow(1 - t, 3),
+      easeInOutCubic:t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2,
+      easeOutBack:   t => {
+        const c1 = 1.70158, c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+      },
+    };
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const animate = ({ from = 0, to = 1, start = 0, end = 1, ease = Easing.easeOutCubic }) => t => {
+      if (t <= start) return from;
+      if (t >= end)   return to;
+      return from + (to - from) * ease((t - start) / (end - start));
+    };
+
+    const TimelineContext = React.createContext({ time: 0, duration: 10 });
+    const useTime = () => React.useContext(TimelineContext).time;
+
+    // ─── Stage ───────────────────────────────────────────────────────────────
+    function Stage({ width = 1920, height = 1080, duration = 10, background = '#E6ECF2', children }) {
+      const [time, setTime]       = React.useState(0);
+      const [playing, setPlaying] = React.useState(true);
+      const [scale, setScale]     = React.useState(1);
+      const stageRef = React.useRef(null);
+      const rafRef   = React.useRef(null);
+      const lastTs   = React.useRef(null);
+
+      React.useEffect(() => {
+        const measure = () => {
+          if (!stageRef.current) return;
+          const w = stageRef.current.clientWidth;
+          const h = stageRef.current.clientHeight - 52;
+          setScale(Math.max(0.05, Math.min(w / width, h / height)));
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(stageRef.current);
+        window.addEventListener('resize', measure);
+        return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+      }, [width, height]);
+
+      React.useEffect(() => {
+        if (!playing) { lastTs.current = null; return; }
+        const step = (ts) => {
+          if (lastTs.current == null) lastTs.current = ts;
+          const dt = (ts - lastTs.current) / 1000;
+          lastTs.current = ts;
+          setTime(t => {
+            let next = t + dt;
+            if (next >= duration) next = next % duration;
+            return next;
+          });
+          rafRef.current = requestAnimationFrame(step);
+        };
+        rafRef.current = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(rafRef.current);
+      }, [playing, duration]);
+
+      React.useEffect(() => {
+        const onKey = (e) => {
+          if (e.code === 'Space') { e.preventDefault(); setPlaying(p => !p); }
+          else if (e.code === 'ArrowLeft')  setTime(t => clamp(t - (e.shiftKey ? 1 : 0.1), 0, duration));
+          else if (e.code === 'ArrowRight') setTime(t => clamp(t + (e.shiftKey ? 1 : 0.1), 0, duration));
+          else if (e.key === '0') setTime(0);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [duration]);
+
+      return (
+        <div ref={stageRef} style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#0a0a0a' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', minHeight: 0 }}>
+            <div style={{ width, height, background, position: 'relative', transform: `scale(${scale})`, transformOrigin: 'center', flexShrink: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
+              <TimelineContext.Provider value={{ time, duration }}>
+                {children}
+              </TimelineContext.Provider>
+            </div>
+          </div>
+          <PlaybackBar time={time} duration={duration} playing={playing} onPlayPause={() => setPlaying(p => !p)} onReset={() => setTime(0)} onSeek={setTime} />
+        </div>
+      );
+    }
+
+    function PlaybackBar({ time, duration, playing, onPlayPause, onReset, onSeek }) {
+      const trackRef = React.useRef(null);
+      const [drag, setDrag] = React.useState(false);
+      const pct = duration > 0 ? (time / duration) * 100 : 0;
+      const fmt = (t) => {
+        const m = Math.floor(t / 60), s = Math.floor(t % 60), cs = Math.floor((t * 100) % 100);
+        return `${m}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
+      };
+      const seek = (e) => {
+        const r = trackRef.current.getBoundingClientRect();
+        onSeek(clamp((e.clientX - r.left) / r.width, 0, 1) * duration);
+      };
+      React.useEffect(() => {
+        if (!drag) return;
+        const up = () => setDrag(false);
+        const mv = (e) => seek(e);
+        window.addEventListener('mouseup', up); window.addEventListener('mousemove', mv);
+        return () => { window.removeEventListener('mouseup', up); window.removeEventListener('mousemove', mv); };
+      }, [drag]);
+      const btn = { width: 28, height: 28, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#f6f4ef', cursor:'pointer', padding:0 };
+      const mono = 'ui-monospace, SFMono-Regular, monospace';
+      return (
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 16px', background:'rgba(20,20,20,0.92)', borderTop:'1px solid rgba(255,255,255,0.08)', width:'100%', maxWidth:680, alignSelf:'center', borderRadius:8, color:'#f6f4ef', fontFamily:'Inter,system-ui,sans-serif', userSelect:'none', flexShrink:0 }}>
+          <button onClick={onReset} title="Return to start" style={btn}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2v10M12 2L5 7l7 5V2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/></svg>
+          </button>
+          <button onClick={onPlayPause} title="Play/pause (space)" style={btn}>
+            {playing ? (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3" y="2" width="3" height="10" fill="currentColor"/><rect x="8" y="2" width="3" height="10" fill="currentColor"/></svg>) : (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2l9 5-9 5V2z" fill="currentColor"/></svg>)}
+          </button>
+          <div style={{ fontFamily:mono, fontSize:12, fontVariantNumeric:'tabular-nums', width:64, textAlign:'right' }}>{fmt(time)}</div>
+          <div ref={trackRef} onMouseDown={(e)=>{setDrag(true);seek(e);}} style={{ flex:1, height:22, position:'relative', cursor:'pointer', display:'flex', alignItems:'center' }}>
+            <div style={{ position:'absolute', left:0, right:0, height:4, background:'rgba(255,255,255,0.12)', borderRadius:2 }}/>
+            <div style={{ position:'absolute', left:0, width:`${pct}%`, height:4, background:'#0496FF', borderRadius:2 }}/>
+            <div style={{ position:'absolute', left:`${pct}%`, top:'50%', width:12, height:12, marginLeft:-6, marginTop:-6, background:'#fff', borderRadius:6, boxShadow:'0 2px 4px rgba(0,0,0,0.4)' }}/>
+          </div>
+          <div style={{ fontFamily:mono, fontSize:12, fontVariantNumeric:'tabular-nums', width:64, color:'rgba(246,244,239,0.55)' }}>{fmt(duration)}</div>
+        </div>
+      );
+    }
+
+    // ─── Icon (recoloured SVG) ───────────────────────────────────────────────
+    function Icon({ name, size, accent }) {
+      const raw = ICON_SVGS[name] || '';
+      const html = raw
+        .replace(/fill:#33CCCC/gi, `fill:${accent}`)
+        .replace(/<svg\s[^>]*>/, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${size}" height="${size}" fill="white">`);
+      return <div style={{ width:size, height:size, display:'block' }} dangerouslySetInnerHTML={{ __html: html }} />;
+    }
+
+    // ─── Scene geometry ──────────────────────────────────────────────────────
+    const ICON_SIZE = 300;
+    const ICON_CY   = 600;
+    const LEFT_ACCENT  = '#0496FF';
+    const RIGHT_ACCENT = '#F865B0';
+
+    const ICON_POS_L = [{ cx: 284,  name: 'rocket' }, { cx: 673,  name: 'award'  }];
+    const ICON_POS_R = [{ cx: 1256, name: 'laptop' }, { cx: 1644, name: 'goal'   }];
+
+    const TITLE1_C = { cx: 490,  cy: 348 };
+    const TITLE2_C = { cx: 1445, cy: 348 };
+    const BOX_CY   = 856;
+    const BOX_W    = 354;
+
+    // ─── Timings ─────────────────────────────────────────────────────────────
+    const ENTRY_START = 0.20;
+    const ENTRY_END   = 3.20;
+
+    const FADE_DUR   = 0.50;
+    const PULSE_DUR  = 0.70;
+    const OPACITY_DUR = 0.35;
+
+    const TITLE1_FADE_START = 3.30;
+    const TITLE2_FADE_START = 5.40;
+    const PAIR_STARTS = [3.80, 4.60, 5.95, 6.75]; // rocket, award, laptop, goal
+
+    // ─── CenteredText ────────────────────────────────────────────────────────
+    function CenteredText({ cx, cy, text, size, weight, font, color = '#000', maxWidth, opacity = 1 }) {
+      return (
+        <div style={{
+          position: 'absolute',
+          left: cx - (maxWidth ? maxWidth / 2 : 0),
+          top:  cy,
+          transform: 'translateY(-50%)',
+          width: maxWidth,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          fontFamily: font, fontWeight: weight, fontSize: size,
+          color, letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+          textAlign: 'center', pointerEvents: 'none',
+          opacity,
+        }}>
+          {text}
+        </div>
+      );
+    }
+
+    // ─── Reveal wrappers ─────────────────────────────────────────────────────
+    function FadeIn({ startTime, duration = FADE_DUR, children }) {
+      const t = useTime();
+      const opacity = animate({ from: 0, to: 1, start: startTime, end: startTime + duration })(t);
+      return <div style={{ position:'absolute', inset:0, opacity, pointerEvents:'none' }}>{children}</div>;
+    }
+
+    function IconPulse({ name, accent, cx, cy, size, startTime }) {
+      const t = useTime();
+      if (t < startTime - 0.001) return null;
+      const p       = clamp((t - startTime) / PULSE_DUR, 0, 1);
+      const scale   = Easing.easeOutBack(p);                       // 0 → peak(~1.10) → 1
+      const opacity = clamp((t - startTime) / OPACITY_DUR, 0, 1);
+      return (
+        <div style={{
+          position:'absolute',
+          left: cx - size / 2,
+          top:  cy - size / 2,
+          width: size, height: size,
+          opacity,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          pointerEvents: 'none',
+        }}>
+          <Icon name={name} size={size} accent={accent} />
+        </div>
+      );
+    }
+
+    // ─── Container group — everything that slides (base, title bar, white boxes) ─
+    // The white label boxes are attached to the container and stay stationary
+    // after the slide. Only the icons and the text are revealed separately.
+    function ContainerGroup({ side, translateY }) {
+      const isLeft = side === 'left';
+      const basePng   = isLeft ? 'Assets/Base_1.png'            : 'Assets/Base_2.png';
+      const boxesPng  = isLeft ? 'Assets/Base_1_two_boxes.png'  : 'Assets/Base_2_two_boxes.png';
+      const titlePng  = isLeft ? 'Assets/Title1_Box.png'        : 'Assets/Title2_Box.png';
+      const groupStyle = { position:'absolute', left:0, top:0, width:1920, height:1080, transform:`translateY(${translateY}px)`, willChange:'transform' };
+      const s = { position:'absolute', left:0, top:0, width:1920, height:1080, pointerEvents:'none', display:'block' };
+      return (
+        <div style={groupStyle}>
+          <img src={basePng}  style={s} alt="" />
+          <img src={titlePng} style={s} alt="" />
+          <img src={boxesPng} style={s} alt="" />
+        </div>
+      );
+    }
+
+    // ─── Scene ───────────────────────────────────────────────────────────────
+    function Scene() {
+      const t = useTime();
+      const leftTY  = animate({ from:  1080, to: 0, start: ENTRY_START, end: ENTRY_END, ease: Easing.easeOutCubic })(t);
+      const rightTY = animate({ from: -1080, to: 0, start: ENTRY_START, end: ENTRY_END, ease: Easing.easeOutCubic })(t);
+
+      const titleFont = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif";
+      const boxFont   = "'Satoshi', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif";
+
+      return (
+        <div style={{ position:'absolute', inset:0, background:'#E6ECF2', overflow:'hidden' }}>
+          {/* 1) Containers slide in — navy bases + coloured title bars + white boxes (stationary after slide) */}
+          <ContainerGroup side="left"  translateY={leftTY}  />
+          <ContainerGroup side="right" translateY={rightTY} />
+
+          {/* 2) Title 1 text fades in */}
+          <FadeIn startTime={TITLE1_FADE_START}>
+            <CenteredText
+              cx={TITLE1_C.cx} cy={TITLE1_C.cy}
+              text="Title 1 (Edit)" size={55.5} weight={800}
+              font={titleFont} maxWidth={800}
+            />
+          </FadeIn>
+
+          {/* 3) Pair 1 — Rocket pulses, Box 1 text fades in */}
+          <IconPulse name="rocket" accent={LEFT_ACCENT}
+                     cx={ICON_POS_L[0].cx} cy={ICON_CY} size={ICON_SIZE}
+                     startTime={PAIR_STARTS[0]} />
+          <FadeIn startTime={PAIR_STARTS[0]}>
+            <CenteredText cx={ICON_POS_L[0].cx} cy={BOX_CY} text="Box 1"
+                          size={37} weight={700} font={boxFont} maxWidth={BOX_W} />
+          </FadeIn>
+
+          {/* 4) Pair 2 — Award pulses, Box 2 text fades in */}
+          <IconPulse name="award" accent={LEFT_ACCENT}
+                     cx={ICON_POS_L[1].cx} cy={ICON_CY} size={ICON_SIZE}
+                     startTime={PAIR_STARTS[1]} />
+          <FadeIn startTime={PAIR_STARTS[1]}>
+            <CenteredText cx={ICON_POS_L[1].cx} cy={BOX_CY} text="Box 2"
+                          size={37} weight={700} font={boxFont} maxWidth={BOX_W} />
+          </FadeIn>
+
+          {/* 5) Title 2 text fades in */}
+          <FadeIn startTime={TITLE2_FADE_START}>
+            <CenteredText
+              cx={TITLE2_C.cx} cy={TITLE2_C.cy}
+              text="Title 2 (Edit)" size={55.5} weight={800}
+              font={titleFont} maxWidth={800}
+            />
+          </FadeIn>
+
+          {/* 6) Pair 3 — Laptop pulses, Box 3 text fades in */}
+          <IconPulse name="laptop" accent={RIGHT_ACCENT}
+                     cx={ICON_POS_R[0].cx} cy={ICON_CY} size={ICON_SIZE}
+                     startTime={PAIR_STARTS[2]} />
+          <FadeIn startTime={PAIR_STARTS[2]}>
+            <CenteredText cx={ICON_POS_R[0].cx} cy={BOX_CY} text="Box 3"
+                          size={37} weight={700} font={boxFont} maxWidth={BOX_W} />
+          </FadeIn>
+
+          {/* 7) Pair 4 — Goal pulses, Box 4 text fades in */}
+          <IconPulse name="goal" accent={RIGHT_ACCENT}
+                     cx={ICON_POS_R[1].cx} cy={ICON_CY} size={ICON_SIZE}
+                     startTime={PAIR_STARTS[3]} />
+          <FadeIn startTime={PAIR_STARTS[3]}>
+            <CenteredText cx={ICON_POS_R[1].cx} cy={BOX_CY} text="Box 4"
+                          size={37} weight={700} font={boxFont} maxWidth={BOX_W} />
+          </FadeIn>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <Stage width={1920} height={1080} duration={10} background="#E6ECF2">
+          <Scene />
+        </Stage>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

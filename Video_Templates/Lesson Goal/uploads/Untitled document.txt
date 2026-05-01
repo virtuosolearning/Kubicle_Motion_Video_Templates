@@ -1,0 +1,15 @@
+﻿Lesson Goal Template. 
+
+
+A clean and dynamic "Lesson Goal" transition screen designed to easily fade in from the Title Screen Template. This template shifts the visual energy from the dark, immersive title screen to a bright, high-clarity layout that signals the start of the learning content.
+
+
+Background: A minimalist,  Platinum Blue (#E6ECF2) background. A thick, bold diagonal stripe in bright white cuts across the screen from the bottom-center to the top-right, creating a sense of forward motion and direction. The design utilises strong diagonal lines and purposeful white space to guide the viewer's eye from the goal text on the left to the success icon on the right. The transition from the dark Oxford Blue title screen to this bright Platinum Blue layout creates a refreshing visual reset for the viewer.
+
+
+Key interpretable elements include:
+* Lesson Goal Branding (Centre-Left): * Header: The words "Lesson Goal" in a bold, dodger blue (#0496FF) Inter extra bold font at 74px size.
+* Subtext: The placeholder "Paste Lesson Goal" in a smaller, satoshi medium font sized at around 55.5px, positioned directly beneath the header. It provides context for what the viewer will learn in the lesson. 
+
+
+Video Animation Example: https://drive.google.com/file/d/1FSkLJXck8GJGBSCL6HU4BO88JMYO5QE-/view?usp=sharing

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3 Points — 2 Subtopics</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0a0a0a;
+      font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    // ─── Inline SVG icons ────────────────────────────────────────────────────
+    // Left-side anchor icon — graphic.svg from the Icon Library, recoloured:
+    // default Oxford Blue (#052438) → Platinum Blue (#E6ECF2) base, the
+    // existing Dodger Blue (#0496FF) accent is preserved.
+    const ANCHOR_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="#E6ECF2">
+<g>
+  <path style="fill:#0496FF;" d="M171.444,116.068c-52.688,0-95.553,42.955-95.553,95.754s42.865,95.754,95.553,95.754s95.553-42.955,95.553-95.754S224.133,116.068,171.444,116.068z M244.181,200.819h-61.738v-61.928C214.222,143.689,239.406,168.95,244.181,200.819z M171.444,285.576c-40.558,0-73.553-33.086-73.553-73.754c0-36.92,27.194-67.59,62.551-72.93v72.927c0,6.075,4.925,11,11,11h72.739C238.87,258.29,208.276,285.576,171.444,285.576z"/>
+  <g>
+    <path d="M501,86.384c6.075,0,11-4.925,11-11v-53.76c0-6.075-4.925-11-11-11H11c-6.075,0-11,4.925-11,11v53.76c0,6.075,4.925,11,11,11h14.778v250.88H11c-6.075,0-11,4.925-11,11v53.759c0,6.075,4.925,11,11,11h234v11.559c-16.232,4.772-28.119,19.825-28.119,37.608c0,21.607,17.549,39.187,39.119,39.187s39.119-17.579,39.119-39.187c0-17.783-11.887-32.836-28.119-37.608v-11.559h234c6.075,0,11-4.925,11-11v-53.759c0-6.075-4.925-11-11-11h-14.778V86.384H501z M273.119,462.189c0,9.477-7.68,17.187-17.119,17.187s-17.119-7.71-17.119-17.187s7.68-17.186,17.119-17.186S273.119,452.713,273.119,462.189z M22,32.624h468v31.76H22V32.624z M490,391.022H22v-31.759h468V391.022z M464.222,337.264H47.778V86.384h416.443V337.264z"/>
+    <path d="M305.783,204.889h109.019c6.075,0,11-4.925,11-11v-66.82c0-6.075-4.925-11-11-11H305.783c-6.075,0-11,4.925-11,11v66.82C294.783,199.964,299.708,204.889,305.783,204.889z M316.783,138.068h87.019v44.82h-87.019V138.068z"/>
+    <path d="M305.783,251.339h109.019c6.075,0,11-4.925,11-11s-4.925-11-11-11H305.783c-6.075,0-11,4.925-11,11S299.708,251.339,305.783,251.339z"/>
+    <path d="M414.802,273.578H305.783c-6.075,0-11,4.925-11,11s4.925,11,11,11h109.019c6.075,0,11-4.925,11-11S420.877,273.578,414.802,273.578z"/>
+  </g>
+</g>
+</svg>`;
+
+    // arrow-small-right.svg from the template folder (Title pill leading icon).
+    const ARROW_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%"><path d="M18,12h0a2,2,0,0,0-.59-1.4l-4.29-4.3a1,1,0,0,0-1.41,0,1,1,0,0,0,0,1.42L15,11H5a1,1,0,0,0,0,2H15l-3.29,3.29a1,1,0,0,0,1.41,1.42l4.29-4.3A2,2,0,0,0,18,12Z" fill="currentColor"/></svg>`;
+
+    function InlineSVG({ svg, style }) {
+      return <div style={style} dangerouslySetInnerHTML={{ __html: svg }} />;
+    }
+
+    // ─── Easing + helpers ────────────────────────────────────────────────────
+    const Easing = {
+      linear:         t => t,
+      easeOutQuad:    t => t * (2 - t),
+      easeInOutQuad:  t => t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2,
+      easeOutCubic:   t => 1 - Math.pow(1 - t, 3),
+      easeInOutCubic: t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2,
+      easeInOutQuint: t => t < 0.5 ? 16*t*t*t*t*t : 1 - Math.pow(-2*t + 2, 5) / 2,
+      // Subtle back ease for the "overshoots slightly" main idea pills.
+      easeOutBackSubtle: t => {
+        const c1 = 0.9, c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+      },
+      // Even gentler back ease for the smaller detail shells.
+      easeOutBackTiny: t => {
+        const c1 = 0.45, c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+      },
+    };
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const animate = ({ from = 0, to = 1, start = 0, end = 1, ease = Easing.easeInOutCubic }) => t => {
+      if (t <= start) return from;
+      if (t >= end)   return to;
+      return from + (to - from) * ease((t - start) / (end - start));
+    };
+
+    const TimelineContext = React.createContext({ time: 0, duration: 15 });
+    const useTime = () => React.useContext(TimelineContext).time;
+
+    // ─── Stage ───────────────────────────────────────────────────────────────
+    function Stage({ width = 1920, height = 1080, duration = 15, background = '#E6ECF2', children }) {
+      const [time, setTime]       = React.useState(0);
+      const [playing, setPlaying] = React.useState(true);
+      const [scale, setScale]     = React.useState(1);
+      const stageRef = React.useRef(null);
+      const rafRef   = React.useRef(null);
+      const lastTs   = React.useRef(null);
+
+      React.useEffect(() => {
+        const measure = () => {
+          if (!stageRef.current) return;
+          const w = stageRef.current.clientWidth;
+          const h = stageRef.current.clientHeight - 52;
+          setScale(Math.max(0.05, Math.min(w / width, h / height)));
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(stageRef.current);
+        window.addEventListener('resize', measure);
+        return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+      }, [width, height]);
+
+      React.useEffect(() => {
+        if (!playing) { lastTs.current = null; return; }
+        const step = (ts) => {
+          if (lastTs.current == null) lastTs.current = ts;
+          const dt = (ts - lastTs.current) / 1000;
+          lastTs.current = ts;
+          setTime(t => {
+            let next = t + dt;
+            if (next >= duration) next = next % duration;
+            return next;
+          });
+          rafRef.current = requestAnimationFrame(step);
+        };
+        rafRef.current = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(rafRef.current);
+      }, [playing, duration]);
+
+      React.useEffect(() => {
+        const onKey = (e) => {
+          if (e.code === 'Space') { e.preventDefault(); setPlaying(p => !p); }
+          else if (e.code === 'ArrowLeft')  setTime(t => clamp(t - (e.shiftKey ? 1 : 0.1), 0, duration));
+          else if (e.code === 'ArrowRight') setTime(t => clamp(t + (e.shiftKey ? 1 : 0.1), 0, duration));
+          else if (e.key === '0') setTime(0);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [duration]);
+
+      return (
+        <div ref={stageRef} style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#0a0a0a' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', minHeight: 0 }}>
+            <div style={{ width, height, background, position: 'relative', transform: `scale(${scale})`, transformOrigin: 'center', flexShrink: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
+              <TimelineContext.Provider value={{ time, duration }}>
+                {children}
+              </TimelineContext.Provider>
+            </div>
+          </div>
+          <PlaybackBar time={time} duration={duration} playing={playing} onPlayPause={() => setPlaying(p => !p)} onReset={() => setTime(0)} onSeek={setTime} />
+        </div>
+      );
+    }
+
+    function PlaybackBar({ time, duration, playing, onPlayPause, onReset, onSeek }) {
+      const trackRef = React.useRef(null);
+      const [drag, setDrag] = React.useState(false);
+      const pct = duration > 0 ? (time / duration) * 100 : 0;
+      const fmt = (t) => {
+        const m = Math.floor(t / 60), s = Math.floor(t % 60), cs = Math.floor((t * 100) % 100);
+        return `${m}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
+      };
+      const seek = (e) => {
+        const r = trackRef.current.getBoundingClientRect();
+        onSeek(clamp((e.clientX - r.left) / r.width, 0, 1) * duration);
+      };
+      React.useEffect(() => {
+        if (!drag) return;
+        const up = () => setDrag(false);
+        const mv = (e) => seek(e);
+        window.addEventListener('mouseup', up); window.addEventListener('mousemove', mv);
+        return () => { window.removeEventListener('mouseup', up); window.removeEventListener('mousemove', mv); };
+      }, [drag]);
+      const btn = { width: 28, height: 28, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#f6f4ef', cursor:'pointer', padding:0 };
+      const mono = 'ui-monospace, SFMono-Regular, monospace';
+      return (
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 16px', background:'rgba(20,20,20,0.92)', borderTop:'1px solid rgba(255,255,255,0.08)', width:'100%', maxWidth:680, alignSelf:'center', borderRadius:8, color:'#f6f4ef', fontFamily:'Inter,system-ui,sans-serif', userSelect:'none', flexShrink:0 }}>
+          <button onClick={onReset} title="Return to start" style={btn}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2v10M12 2L5 7l7 5V2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/></svg>
+          </button>
+          <button onClick={onPlayPause} title="Play/pause (space)" style={btn}>
+            {playing ? (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3" y="2" width="3" height="10" fill="currentColor"/><rect x="8" y="2" width="3" height="10" fill="currentColor"/></svg>) : (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2l9 5-9 5V2z" fill="currentColor"/></svg>)}
+          </button>
+          <div style={{ fontFamily:mono, fontSize:12, fontVariantNumeric:'tabular-nums', width:64, textAlign:'right' }}>{fmt(time)}</div>
+          <div ref={trackRef} onMouseDown={(e)=>{setDrag(true);seek(e);}} style={{ flex:1, height:22, position:'relative', cursor:'pointer', display:'flex', alignItems:'center' }}>
+            <div style={{ position:'absolute', left:0, right:0, height:4, background:'rgba(255,255,255,0.12)', borderRadius:2 }}/>
+            <div style={{ position:'absolute', left:0, width:`${pct}%`, height:4, background:'#0496FF', borderRadius:2 }}/>
+            <div style={{ position:'absolute', left:`${pct}%`, top:'50%', width:12, height:12, marginLeft:-6, marginTop:-6, background:'#fff', borderRadius:6, boxShadow:'0 2px 4px rgba(0,0,0,0.4)' }}/>
+          </div>
+          <div style={{ fontFamily:mono, fontSize:12, fontVariantNumeric:'tabular-nums', width:64, color:'rgba(246,244,239,0.55)' }}>{fmt(duration)}</div>
+        </div>
+      );
+    }
+
+    // ─── Scene constants (measured directly from the supplied PNGs) ──────────
+    const FONT_STACK = "'Satoshi', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif";
+
+    // Oxford_Blue_Splitscreen.png covers x=842..1919 (right 1078px). Sliding
+    // the asset by +1078 parks it just past the right edge.
+    const SPLIT_TRAVEL = 1078;
+
+    // Icon_Base.png solid bbox: x=71..777, y=52..1040 → centre (424, 546).
+    const PANEL_CX = 424;
+    const PANEL_CY = 546;
+    const PANEL_ICON_SIZE = 480;
+
+    // Shared geometry of the right-side pills (all three colours line up).
+    const TITLE_LEFT  = 942;   // pill graphic left edge
+    const TITLE_RIGHT = 1840;
+    const TITLE_W     = TITLE_RIGHT - TITLE_LEFT;
+    const SHELL_LEFT  = 949;
+    const SHELL_RIGHT = 1835;
+
+    // Title pill source y (centre) for each colour, taken from each PNG.
+    // The asset sits at its own row already, so we render with translateY(0).
+    const TITLE_SRC_CY = { blue: 98, pink: 436, yellow: 779 };
+
+    // Detail shell source y (centre) for each colour.
+    const SHELL_SRC_CY = { blue: 211, pink: 551, yellow: 887 };
+
+    // The second detail row is +110 px below the first (measured from the
+    // Final_Comp.png borders for every colour band).
+    const SHELL_ROW_GAP = 110;
+
+    // ─── Animation timings (15 s total) ──────────────────────────────────────
+    // Phase 1 — background pan + frame reveal.
+    const BG_PAN_START   = 0.00;
+    const BG_PAN_END     = 0.80;
+    const FRAME_FADE_IN  = 0.55;
+    const FRAME_FADE_OUT = 1.40;
+
+    // Each section runs the same internal timeline relative to its start.
+    const SECTION_STARTS = { blue: 1.50, pink: 5.50, yellow: 9.50 };
+
+    // Within a section, relative seconds:
+    const TITLE_SCALE_DUR = 0.80;
+    const TITLE_TEXT_IN   = 0.50;   // text begins fading in
+    const TITLE_TEXT_DUR  = 0.55;
+    const D1_SCALE_START  = 1.00;
+    const D2_SCALE_START  = 2.00;
+    const SHELL_SCALE_DUR = 0.65;
+    const SHELL_TEXT_IN   = 0.40;   // relative to shell scale start
+    const SHELL_TEXT_DUR  = 0.55;
+
+    // Section-relative end ≈ 2.65s. With sections 4s apart, the yellow
+    // section finishes around 12.15s, leaving ~2.85s of held composition.
+
+    const TEXT_LEFT_PAD   = 1040;   // text starts after the leading icon
+    const TEXT_RIGHT_PAD  = 1820;
+
+    // ─── Background (Oxford Blue right panel) ────────────────────────────────
+    function Background({ time }) {
+      const x = animate({
+        from: SPLIT_TRAVEL, to: 0,
+        start: BG_PAN_START, end: BG_PAN_END,
+        ease: Easing.easeInOutCubic,
+      })(time);
+      return (
+        <img src="Assets/Oxford_Blue_Splitscreen.png" alt=""
+             style={{
+               position: 'absolute', inset: 0,
+               width: '100%', height: '100%', display: 'block',
+               transform: `translateX(${x}px)`,
+             }} />
+      );
+    }
+
+    // ─── Left-side icon frame (Icon_Base + recoloured library icon) ──────────
+    function IconFrame({ time }) {
+      const opacity = animate({
+        from: 0, to: 1,
+        start: FRAME_FADE_IN, end: FRAME_FADE_OUT,
+        ease: Easing.easeInOutCubic,
+      })(time);
+      return (
+        <div style={{ position: 'absolute', inset: 0, opacity, pointerEvents: 'none' }}>
+          <img src="Assets/Icon_Base.png" alt=""
+               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
+          <div style={{
+            position: 'absolute',
+            left: PANEL_CX - PANEL_ICON_SIZE / 2,
+            top:  PANEL_CY - PANEL_ICON_SIZE / 2,
+            width: PANEL_ICON_SIZE, height: PANEL_ICON_SIZE,
+          }}>
+            <InlineSVG svg={ANCHOR_ICON_SVG} style={{ width: '100%', height: '100%' }} />
+          </div>
+        </div>
+      );
+    }
+
+    // ─── A single pill graphic (Title or Shell) ──────────────────────────────
+    // Renders the supplied 1920×1080 asset translated to the target row and
+    // scaled around the asset's own pill centre.
+    function PillGraphic({ src, srcCX, srcCY, offsetY, scale, opacity = 1 }) {
+      return (
+        <div style={{
+          position: 'absolute', inset: 0,
+          transform: `translateY(${offsetY}px) scale(${scale})`,
+          transformOrigin: `${srcCX}px ${srcCY}px`,
+          opacity,
+          pointerEvents: 'none',
+        }}>
+          <img src={src} alt=""
+               style={{ width: '100%', height: '100%', display: 'block' }} />
+        </div>
+      );
+    }
+
+    // ─── Section (one colour band: title + 2 detail pills) ───────────────────
+    function Section({ time, colour, sectionStart, titleAsset, shellAsset, mainText, detailTexts, titleArrowColour, titleTextColour, detailTextColour }) {
+      const t = time - sectionStart;
+
+      // Title pill scale-in (with subtle overshoot per spec).
+      const titleScaleProg = clamp(t / TITLE_SCALE_DUR, 0, 1);
+      const titleScale     = titleScaleProg > 0
+        ? Easing.easeOutBackSubtle(titleScaleProg)
+        : 0;
+      const titleSettled   = t >= TITLE_SCALE_DUR;
+      const titleDrawScale = titleSettled ? 1 : titleScale;
+
+      // Title text fade-in.
+      const titleTextOp = animate({
+        from: 0, to: 1,
+        start: TITLE_TEXT_IN, end: TITLE_TEXT_IN + TITLE_TEXT_DUR,
+        ease: Easing.easeInOutCubic,
+      })(t);
+
+      // Detail shells (1 then 2). Each scales in, then its text fades in.
+      const shells = [
+        { rowOffset: 0,                start: D1_SCALE_START, text: detailTexts[0] },
+        { rowOffset: SHELL_ROW_GAP,    start: D2_SCALE_START, text: detailTexts[1] },
+      ];
+
+      const titleSrcCY = TITLE_SRC_CY[colour];
+      const shellSrcCY = SHELL_SRC_CY[colour];
+      const titleCY    = titleSrcCY;     // assets already sit at the right y.
+
+      return (
+        <>
+          {/* Title pill graphic */}
+          <PillGraphic
+            src={titleAsset}
+            srcCX={(TITLE_LEFT + TITLE_RIGHT) / 2}
+            srcCY={titleSrcCY}
+            offsetY={0}
+            scale={titleDrawScale}
+            opacity={titleScaleProg > 0 ? 1 : 0}
+          />
+
+          {/* Title — leading arrow icon + text. Anchored to the source pill
+              y so it scales with the pill (we wrap them in a scaled layer). */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            transform: `scale(${titleDrawScale})`,
+            transformOrigin: `${(TITLE_LEFT + TITLE_RIGHT) / 2}px ${titleSrcCY}px`,
+            opacity: titleScaleProg > 0 ? 1 : 0,
+            pointerEvents: 'none',
+          }}>
+            {/* Leading arrow icon */}
+            <div style={{
+              position: 'absolute',
+              left: 985, top: titleSrcCY - 28,
+              width: 56, height: 56,
+              color: titleArrowColour,
+              opacity: titleTextOp,
+            }}>
+              <InlineSVG svg={ARROW_SVG} style={{ width: '100%', height: '100%' }} />
+            </div>
+            {/* Title text */}
+            <div style={{
+              position: 'absolute',
+              left: TEXT_LEFT_PAD + 20,
+              top: titleSrcCY,
+              transform: 'translateY(-50%)',
+              width: TEXT_RIGHT_PAD - (TEXT_LEFT_PAD + 20),
+              color: titleTextColour,
+              fontFamily: FONT_STACK,
+              fontWeight: 900,                 // Satoshi black
+              fontSize: 55,
+              letterSpacing: '-0.005em',
+              whiteSpace: 'nowrap',
+              opacity: titleTextOp,
+            }}>
+              {mainText}
+            </div>
+          </div>
+
+          {/* Two detail shells */}
+          {shells.map((s, i) => {
+            const sp = clamp((t - s.start) / SHELL_SCALE_DUR, 0, 1);
+            const scale  = sp > 0 ? Easing.easeOutBackTiny(sp) : 0;
+            const settled = t >= s.start + SHELL_SCALE_DUR;
+            const drawScale = settled ? 1 : scale;
+
+            // Typewriter — characters reveal once the shell has settled.
+            const typeStart = s.start + SHELL_SCALE_DUR;
+            const typeProg  = clamp((t - typeStart) / SHELL_TEXT_DUR, 0, 1);
+            const charsShow = Math.floor(s.text.length * typeProg);
+            const visible   = s.text.slice(0, charsShow);
+
+            const targetCY = shellSrcCY + s.rowOffset;
+            return (
+              <React.Fragment key={i}>
+                <PillGraphic
+                  src={shellAsset}
+                  srcCX={(SHELL_LEFT + SHELL_RIGHT) / 2}
+                  srcCY={shellSrcCY}
+                  offsetY={s.rowOffset}
+                  scale={drawScale}
+                  opacity={sp > 0 ? 1 : 0}
+                />
+                <div style={{
+                  position: 'absolute',
+                  left: TEXT_LEFT_PAD,
+                  top:  targetCY,
+                  width: TEXT_RIGHT_PAD - TEXT_LEFT_PAD,
+                  transform: 'translateY(-50%)',
+                  color: detailTextColour,
+                  fontFamily: FONT_STACK,
+                  fontWeight: 700,             // Satoshi bold
+                  fontSize: 33,
+                  letterSpacing: '-0.005em',
+                  whiteSpace: 'nowrap',
+                  opacity: settled ? 1 : 0,
+                  pointerEvents: 'none',
+                }}>
+                  {visible}
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </>
+      );
+    }
+
+    // ─── Scene ───────────────────────────────────────────────────────────────
+    function Scene() {
+      const t = useTime();
+      return (
+        <div style={{ position: 'absolute', inset: 0, background: '#E6ECF2', overflow: 'hidden' }}>
+          {/* Phase 1 — backdrop and visual frame */}
+          <Background time={t} />
+          <IconFrame  time={t} />
+
+          {/* Phase 2 — Blue (Dodger Blue) section */}
+          <Section
+            time={t}
+            colour="blue"
+            sectionStart={SECTION_STARTS.blue}
+            titleAsset="Assets/Title_Pill_Dodger_Blue.png"
+            shellAsset="Assets/Pill_Shell_Dodger_Blue.png"
+            mainText="Paste Main Idea (1)"
+            detailTexts={['Paste Supporting Detail (1)', 'Paste Supporting Detail (2)']}
+            titleArrowColour="#0B1E33"
+            titleTextColour="#0B1E33"
+            detailTextColour="#FFFFFF"
+          />
+
+          {/* Phase 3a — Pink (Wild Strawberry) section */}
+          <Section
+            time={t}
+            colour="pink"
+            sectionStart={SECTION_STARTS.pink}
+            titleAsset="Assets/Title_Pill_Wild_Strawberry.png"
+            shellAsset="Assets/Pill_Shell_Wild_Strawberry.png"
+            mainText="Paste Main Idea (2)"
+            detailTexts={['Paste Supporting Detail (3)', 'Paste Supporting Detail (4)']}
+            titleArrowColour="#0B1E33"
+            titleTextColour="#0B1E33"
+            detailTextColour="#FFFFFF"
+          />
+
+          {/* Phase 3b — Yellow (Lemon Yellow) section. */}
+          <Section
+            time={t}
+            colour="yellow"
+            sectionStart={SECTION_STARTS.yellow}
+            titleAsset="Assets/Title_Pill_Lemon_Yellow.png"
+            shellAsset="Assets/Pill_Shell_Lemon_Yellow.png"
+            mainText="Paste Main Idea 3"
+            detailTexts={['Paste Supporting Detail (5)', 'Paste Supporting Detail (6)']}
+            titleArrowColour="#0B1E33"
+            titleTextColour="#0B1E33"
+            detailTextColour="#FFFFFF"
+          />
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <Stage width={1920} height={1080} duration={15} background="#E6ECF2">
+          <Scene />
+        </Stage>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

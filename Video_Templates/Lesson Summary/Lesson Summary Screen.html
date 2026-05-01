@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lesson Summary Screen</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0a0a; }
+    #root { position: absolute; inset: 0; }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="animations.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+// ─── Tweak defaults ────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "titleText": "Lesson Summary",
+  "titleTime": 0.2,
+  "titleDuration": 0.45,
+  "titleSize": 62,
+  "pill1Text": "Paste Recap 1",
+  "pill2Text": "Paste Recap 2",
+  "pill3Text": "Paste Recap 3",
+  "pill4Text": "Paste Recap 4",
+  "pill5Text": "Paste Recap 5",
+  "pill1Time": 1.0,
+  "pill2Time": 2.0,
+  "pill3Time": 3.0,
+  "pill4Time": 4.0,
+  "pill5Time": 5.0,
+  "pillAnimDuration": 0.55,
+  "pillAnimStyle": "slideUp",
+  "pillSpacing": 118,
+  "slideDistance": 130,
+  "pillTextLeft": 242,
+  "pillTextSize": 28,
+  "titleOffsetX": 0,
+  "titleOffsetY": 0,
+  "titleGap": 110,
+  "contentX": 0,
+  "contentY": 0
+}/*EDITMODE-END*/;
+
+// Natural pill position in the 1920×1080 PNG (measured)
+const PILL_NATURAL = { top: 329, height: 93, left: 133, width: 1136 };
+
+
+
+// ─── Animated Title ────────────────────────────────────────────────────────
+function AnimatedTitle({ text, revealTime, duration, size, cfg }) {
+  const time = useTime();
+  const localT = Math.max(0, time - revealTime);
+  const progress = Math.min(1, localT / Math.max(0.01, duration));
+  const eased = Easing.easeOutCubic(progress);
+  const opacity = eased;
+  const ty = (1 - eased) * 22;
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: PILL_NATURAL.top - cfg.titleGap,
+      left: PILL_NATURAL.left,
+      opacity,
+      transform: `translateY(${ty}px)`,
+      willChange: 'transform, opacity',
+    }}>
+      <span style={{
+        fontFamily: 'Arial Black, Arial, sans-serif',
+        fontWeight: 900,
+        fontSize: size,
+        color: '#0496FF',
+        letterSpacing: '-0.5px',
+        whiteSpace: 'nowrap',
+      }}>
+        {text}
+      </span>
+    </div>
+  );
+}
+
+// ─── Animated Pill (uses Lesson_Summary_Pill.png asset) ───────────────────
+function AnimatedPill({ text, revealTime, animDuration, animStyle, rowIndex, pillSpacing, pillTextLeft, textSize, slideDistance }) {
+  const time = useTime();
+  const localT = Math.max(0, time - revealTime);
+  const raw = Math.min(1, localT / Math.max(0.01, animDuration));
+
+  if (raw === 0) return null;
+
+  const yShift = rowIndex * pillSpacing;
+  const pillCenterY = PILL_NATURAL.top + PILL_NATURAL.height / 2;
+
+  let outerStyle = {};
+
+  if (animStyle === 'slideUp') {
+    const p = Easing.easeOutCubic(raw);
+    const ty = (1 - p) * slideDistance;
+    outerStyle = {
+      opacity: Math.min(1, raw * 4),
+      transform: `translateY(${yShift + ty}px)`,
+    };
+  } else if (animStyle === 'wipe') {
+    const p = Easing.easeOutCubic(raw);
+    outerStyle = {
+      clipPath: `inset(0 ${(1 - p) * 100}% 0 0)`,
+      transform: `translateY(${yShift}px)`,
+    };
+  } else if (animStyle === 'slide') {
+    const p = Easing.easeOutBack(raw);
+    const tx = (1 - p) * -160;
+    outerStyle = { opacity: Math.min(1, raw * 3), transform: `translateY(${yShift}px) translateX(${tx}px)` };
+  } else {
+    // pop
+    const p = Easing.easeOutBack(raw);
+    const sc = 0.78 + 0.22 * p;
+    outerStyle = {
+      opacity: Math.min(1, raw * 4),
+      transform: `translateY(${yShift}px) scale(${sc})`,
+      transformOrigin: `${PILL_NATURAL.left}px ${pillCenterY + yShift}px`,
+    };
+  }
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0, left: 0,
+      width: 1920, height: 1080,
+      willChange: 'transform, opacity, clip-path',
+      ...outerStyle,
+    }}>
+      {/* The actual pill graphic */}
+      <img
+        src="uploads/Lesson_Summary_Template/Assets/Lesson_Summary_Pill.png"
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+        alt=""
+        draggable="false"
+      />
+      {/* Text overlay — positioned at pill centre */}
+      <div style={{
+        position: 'absolute',
+        top: pillCenterY,
+        left: pillTextLeft,
+        transform: 'translateY(-50%)',
+        color: 'white',
+        fontFamily: 'Arial, sans-serif',
+        fontWeight: 600,
+        fontSize: textSize,
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+        letterSpacing: '0.01em',
+      }}>
+        {text}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Scene ────────────────────────────────────────────────────────────
+function LessonSummaryScene({ cfg }) {
+  const pills = [
+    { text: cfg.pill1Text, time: cfg.pill1Time },
+    { text: cfg.pill2Text, time: cfg.pill2Time },
+    { text: cfg.pill3Text, time: cfg.pill3Time },
+    { text: cfg.pill4Text, time: cfg.pill4Time },
+    { text: cfg.pill5Text, time: cfg.pill5Time },
+  ];
+
+  return (
+    <>
+      {/* Background — not affected by global offset */}
+      <img
+        src="uploads/Lesson_Summary_Template/Assets/Lesson_Summary_Background.png"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        alt=""
+        draggable="false"
+      />
+
+      {/* Content group — title + pills move together via contentX/contentY */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0,
+        width: 1920, height: 1080,
+        transform: `translate(${cfg.contentX}px, ${cfg.contentY}px)`,
+      }}>
+        <AnimatedTitle
+          text={cfg.titleText}
+          revealTime={cfg.titleTime}
+          duration={cfg.titleDuration}
+          size={cfg.titleSize}
+          cfg={cfg}
+        />
+
+        {pills.map((pill, i) => (
+          <AnimatedPill
+            key={i}
+            text={pill.text}
+            revealTime={pill.time}
+            animDuration={cfg.pillAnimDuration}
+            animStyle={cfg.pillAnimStyle}
+            rowIndex={i}
+            pillSpacing={cfg.pillSpacing}
+            pillTextLeft={cfg.pillTextLeft}
+            textSize={cfg.pillTextSize}
+            slideDistance={cfg.slideDistance}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ─── Tweaks Panel ──────────────────────────────────────────────────────────
+function TweaksPanel({ cfg, onChange, visible }) {
+  const [tab, setTab] = React.useState('timing');
+  if (!visible) return null;
+
+  const rowStyle = { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 };
+  const labelStyle = { fontSize: 11, color: '#aaa', fontFamily: 'Arial, sans-serif', minWidth: 116, flexShrink: 0 };
+  const inputStyle = {
+    background: '#2a2a2a', border: '1px solid #444', borderRadius: 5,
+    color: '#fff', padding: '3px 8px', fontSize: 12, fontFamily: 'Arial, sans-serif', width: '100%',
+  };
+  const sliderStyle = { width: '100%', accentColor: '#1DB8FF' };
+  const sectionStyle = { fontSize: 10, color: '#555', letterSpacing: '0.08em', marginBottom: 8, marginTop: 14 };
+  const tabBtnStyle = (active) => ({
+    flex: 1, padding: '5px 0', background: active ? '#1DB8FF' : '#2a2a2a',
+    border: 'none', borderRadius: 5, color: active ? '#000' : '#aaa',
+    cursor: 'pointer', fontSize: 11, fontFamily: 'Arial, sans-serif', fontWeight: 700,
+  });
+
+  const SliderRow = ({ label, k, min, max, step = 0.05, suffix = 's' }) => (
+    <div style={rowStyle}>
+      <span style={labelStyle}>{label}</span>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input type="range" min={min} max={max} step={step} value={cfg[k]}
+          onChange={e => onChange(k, parseFloat(e.target.value))} style={sliderStyle} />
+        <span style={{ fontSize: 11, color: '#fff', minWidth: 40, textAlign: 'right', fontFamily: 'monospace' }}>
+          {Number.isInteger(cfg[k]) || step >= 1 ? Math.round(cfg[k]) : cfg[k].toFixed(2)}{suffix}
+        </span>
+      </div>
+    </div>
+  );
+
+  const TextRow = ({ label, k }) => (
+    <div style={rowStyle}>
+      <span style={labelStyle}>{label}</span>
+      <input type="text" value={cfg[k]} style={inputStyle} onChange={e => onChange(k, e.target.value)} />
+    </div>
+  );
+
+  const SelectRow = ({ label, k, options }) => (
+    <div style={rowStyle}>
+      <span style={labelStyle}>{label}</span>
+      <select value={cfg[k]} style={inputStyle} onChange={e => onChange(k, e.target.value)}>
+        {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 60, right: 16, width: 330,
+      background: 'rgba(14,14,18,0.98)', border: '1px solid #2a2a2a',
+      borderRadius: 12, padding: 16, zIndex: 9999,
+      boxShadow: '0 8px 40px rgba(0,0,0,0.8)',
+      maxHeight: '82vh', overflowY: 'auto',
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 12, fontFamily: 'Arial, sans-serif' }}>Tweaks</div>
+
+      <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+        {['timing','text','layout'].map(t => (
+          <button key={t} style={tabBtnStyle(tab===t)} onClick={() => setTab(t)}>
+            {t.charAt(0).toUpperCase()+t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'timing' && <>
+        <div style={sectionStyle}>TITLE</div>
+        <SliderRow label="Title reveal" k="titleTime" min={0} max={5} />
+        <SliderRow label="Title anim dur." k="titleDuration" min={0.1} max={1.5} />
+        <SliderRow label="Title gap (↕ above pill)" k="titleGap" min={60} max={300} step={1} suffix="px" />
+        <div style={sectionStyle}>PILL REVEAL TIMES</div>
+        <SliderRow label="Pill 1 reveal" k="pill1Time" min={0} max={9.5} />
+        <SliderRow label="Pill 2 reveal" k="pill2Time" min={0} max={9.5} />
+        <SliderRow label="Pill 3 reveal" k="pill3Time" min={0} max={9.5} />
+        <SliderRow label="Pill 4 reveal" k="pill4Time" min={0} max={9.5} />
+        <SliderRow label="Pill 5 reveal" k="pill5Time" min={0} max={9.5} />
+        <div style={sectionStyle}>ANIMATION</div>
+        <SliderRow label="Pill anim dur." k="pillAnimDuration" min={0.1} max={1.5} />
+        <SliderRow label="Slide distance" k="slideDistance" min={20} max={400} step={5} suffix="px" />
+        <SelectRow label="Entry style" k="pillAnimStyle" options={[
+          {v:'slideUp', l:'Slide up from below'},
+          {v:'wipe',    l:'Wipe (left → right)'},
+          {v:'slide',   l:'Slide in from left'},
+          {v:'pop',     l:'Pop in'},
+        ]} />
+      </>}
+
+      {tab === 'text' && <>
+        <div style={sectionStyle}>LABELS</div>
+        <TextRow label="Title" k="titleText" />
+        <TextRow label="Pill 1" k="pill1Text" />
+        <TextRow label="Pill 2" k="pill2Text" />
+        <TextRow label="Pill 3" k="pill3Text" />
+        <TextRow label="Pill 4" k="pill4Text" />
+        <TextRow label="Pill 5" k="pill5Text" />
+        <div style={sectionStyle}>SIZES</div>
+        <SliderRow label="Title size" k="titleSize" min={30} max={110} step={1} suffix="px" />
+        <SliderRow label="Pill text size" k="pillTextSize" min={16} max={52} step={1} suffix="px" />
+        <SliderRow label="Text left pos." k="pillTextLeft" min={150} max={500} step={1} suffix="px" />
+      </>}
+
+      {tab === 'layout' && <>
+        <div style={sectionStyle}>MOVE ALL CONTENT TOGETHER</div>
+        <SliderRow label="Offset X" k="contentX" min={-400} max={400} step={1} suffix="px" />
+        <SliderRow label="Offset Y" k="contentY" min={-400} max={400} step={1} suffix="px" />
+        <div style={sectionStyle}>PILL LAYOUT</div>
+        <SliderRow label="Pill spacing" k="pillSpacing" min={90} max={220} step={1} suffix="px" />
+      </>}
+    </div>
+  );
+}
+
+// ─── App ───────────────────────────────────────────────────────────────────
+function App() {
+  const [cfg, setCfg] = React.useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('lessonSummaryCfg') || '{}');
+      return { ...TWEAK_DEFAULTS, ...saved };
+    } catch { return { ...TWEAK_DEFAULTS }; }
+  });
+  const [tweaksVisible, setTweaksVisible] = React.useState(false);
+
+  const handleChange = (key, val) => {
+    setCfg(prev => {
+      const next = { ...prev, [key]: val };
+      try { localStorage.setItem('lessonSummaryCfg', JSON.stringify(next)); } catch {}
+      window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: val } }, '*');
+      return next;
+    });
+  };
+
+  // Tweaks protocol
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode')   setTweaksVisible(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksVisible(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  return (
+    <>
+      <Stage width={1920} height={1080} duration={10} background="#040d18" persistKey="lessonSummary">
+        <LessonSummaryScene cfg={cfg} />
+      </Stage>
+      <TweaksPanel cfg={cfg} onChange={handleChange} visible={tweaksVisible} />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
