@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3 Big Points — v3</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0a0a0a;
+      font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    // ─── Inline SVG icons ────────────────────────────────────────────────────
+    // SIDE icons — pulled verbatim from /Video_Templates/Icon Library and
+    // recoloured per spec ("Pure White line art with Dodger Blue highlights"):
+    // default Oxford Blue (#052438) → white; #0496FF accents kept.
+
+    // vocabulary.svg — speech-bubble + book/letters glyph
+    const ICON_VOCAB_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="#FFFFFF">
+<g>
+  <path d="M490.659,395.15l-10.17-47.128c-1.093-5.064-5.571-8.68-10.752-8.68l-55.528-0.001c-17.604,0-34.898-4.598-50.014-13.295c-13.677-7.87-29.289-12.029-45.148-12.029c-23.892,0-46.261,9.166-63.07,25.513c-16.81-16.347-39.179-25.513-63.071-25.513c-15.86,0-31.472,4.16-45.148,12.029c-15.116,8.697-32.411,13.295-50.013,13.295l-55.529,0.001c-5.181,0-9.66,3.615-10.752,8.68l-10.174,47.149C8.858,399.906,0,411.943,0,426.016c0,18.196,14.804,33,33,33h181.553c4.872,18.399,21.664,32,41.574,32s36.703-13.601,41.574-32H479c18.196,0,33-14.804,33-33C512,411.923,503.117,399.872,490.659,395.15z M319.046,336.016c12.014,0,23.833,3.146,34.177,9.098c18.448,10.615,39.536,16.227,60.985,16.227l46.649,0.001l6.835,31.674H266.976v-33.089C280.054,344.688,298.83,336.016,319.046,336.016z M97.745,361.341c21.447,0,42.536-5.612,60.984-16.227c10.344-5.952,22.162-9.098,34.176-9.098c20.216,0,38.993,8.672,52.071,23.911v33.089H44.26l6.835-31.674L97.745,361.341z M479,437.016H288.127c-6.075,0-11,4.925-11,11c0,11.58-9.42,21-21,21s-21-9.42-21-21c0-6.075-4.925-11-11-11H33c-6.065,0-11-4.935-11-11s4.935-11,11-11h446c6.065,0,11,4.935,11,11S485.065,437.016,479,437.016z"/>
+  <g>
+    <path style="fill:#0496FF;" d="M183.622,85.336c-0.038-0.101-0.078-0.202-0.119-0.302c-2.013-4.891-6.729-8.05-12.017-8.05c-0.005,0-0.009,0-0.014,0c-5.293,0.006-10.009,3.175-12.014,8.075c-0.034,0.083-0.067,0.166-0.099,0.25l-33.043,86.76c-2.162,5.677,0.688,12.032,6.365,14.195c1.289,0.491,2.611,0.723,3.913,0.723c4.433,0,8.61-2.699,10.282-7.088l2.168-5.693h44.601l2.137,5.662c2.145,5.684,8.491,8.551,14.175,6.408c5.684-2.145,8.553-8.492,6.408-14.175L183.622,85.336z M157.423,152.206l14.024-36.822l13.896,36.822H157.423z"/>
+    <path style="fill:#0496FF;" d="M375.404,164.984h-38.409l46.259-70.995c2.203-3.381,2.378-7.698,0.455-11.246c-1.923-3.548-5.635-5.759-9.671-5.759h-55.534c-6.075,0-11,4.925-11,11s4.925,11,11,11h35.238l-46.259,70.995c-2.203,3.381-2.378,7.698-0.455,11.246c1.923,3.548,5.635,5.759,9.671,5.759h58.706c6.075,0,11-4.925,11-11S381.479,164.984,375.404,164.984z"/>
+    <path style="fill:#0496FF;" d="M275.461,120.984h-28.151c-6.075,0-11,4.925-11,11s4.925,11,11,11h28.151c6.075,0,11-4.925,11-11S281.537,120.984,275.461,120.984z"/>
+    <path style="fill:#0496FF;" d="M413,20.984H99c-30.327,0-55,24.673-55,55v112c0,30.327,24.673,55,55,55h118.317l29.156,50.5c1.965,3.403,5.597,5.5,9.526,5.5s7.562-2.097,9.526-5.5l29.156-50.5H413c30.327,0,55-24.673,55-55v-112C468,45.657,443.327,20.984,413,20.984z M446,187.984c0,18.196-14.804,33-33,33H288.332c-3.93,0-7.562,2.097-9.526,5.5L256,265.984l-22.805-39.5c-1.965-3.403-5.597-5.5-9.526-5.5H99c-18.196,0-33-14.804-33-33v-112c0-18.196,14.804-33,33-33h314c18.196,0,33,14.804,33,33V187.984z"/>
+  </g>
+</g>
+</svg>`;
+
+    // strong-mind.svg — head/brain glyph (pulled verbatim, recoloured)
+    const ICON_STRONG_MIND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="#FFFFFF">
+<g>
+  <g>
+    <g><path style="fill:#0496FF;" d="M292.183,264.16H164.815c-6.075,0-11-4.925-11-11s4.925-11,11-11h127.367c6.075,0,11,4.925,11,11S298.258,264.16,292.183,264.16z"/></g>
+    <g><path style="fill:#0496FF;" d="M292.183,322.16H164.815c-6.075,0-11-4.925-11-11s4.925-11,11-11h127.367c6.075,0,11,4.925,11,11S298.258,322.16,292.183,322.16z"/></g>
+  </g>
+  <path d="M453.282,276.192c-5.078-5.125-11.312-9.737-17.339-14.198c-13.782-10.199-26.801-19.833-26.801-34.507c0-61.526-27.824-109.867-78.452-136.636V53.489c0-18.469-15.073-33.494-33.601-33.494c-6.335,0-12.265,1.759-17.328,4.81c-6.042-8.926-16.28-14.808-27.87-14.808c-6.333,0-12.265,1.758-17.328,4.81C228.521,5.882,218.282,0,206.692,0c-11.591,0-21.829,5.881-27.871,14.807c-5.063-3.051-10.993-4.81-17.328-4.81c-18.527,0-33.601,15.026-33.601,33.495v30.206c-9.205,6.611-15.202,17.305-15.202,29.358v11.18c-19.419,15.575-34.808,34.365-45.776,55.92c-12.647,24.854-19.06,52.784-19.06,83.015c0,38.866,12.657,77.458,35.64,108.665l1.856,2.519c20.436,27.72,24.118,32.715,24.118,64.385V501c0,6.075,4.925,11,11,11s11-4.925,11-11v-72.261c0-38.903-7.159-48.614-28.41-77.44l-1.85-2.51c-20.22-27.455-31.354-61.413-31.354-95.619c0-53.307,21.838-88.733,44.737-111.233c1.848,9.729,5.026,19.168,9.482,28.066c-18.77,23.575-29.074,52.978-29.074,83.167c0,73.612,59.888,133.5,133.5,133.5c73.611,0,133.499-59.888,133.499-133.5c0-34.797-13.892-68.689-38.215-93.5c4.505-11.965,6.907-24.757,6.907-37.823v-5.502c36.532,23.714,56.452,62.606,56.452,111.143c0,25.763,19.803,40.417,35.715,52.191c5.607,4.15,10.905,8.07,14.797,11.998c3.238,3.268,4.812,6.655,4.432,9.537c-0.34,2.583-2.247,5.006-5.37,6.826c-1.251,0.729-2.501,1.433-3.733,2.128c-12.724,7.172-29.912,16.859-24.571,44.341l-5.46,9.625c-2.168,3.821-1.854,8.566,0.798,12.068c2.621,3.461-0.126,7.359-1.428,8.875c-1.082,1.258-1.864,2.744-2.29,4.348c-2.297,8.653-0.361,16.507,1.194,22.817c2.157,8.751,2.625,11.735-1.889,16.25c-4.567,4.57-13.79,6.985-26.67,6.985c-45.857,0-68.149,15.835-68.149,48.412V501c0,6.075,4.925,11,11,11s11-4.925,11-11v-17.11c0-9.878,0-26.412,46.149-26.412c19.112,0,33.32-4.52,42.23-13.433c13.498-13.505,10.002-27.686,7.688-37.069c-0.945-3.835-1.784-7.24-1.58-10.114c5.969-8.402,7.384-18.406,4.065-27.134l4.585-8.083c1.421-2.505,1.804-5.467,1.064-8.25c-3.856-14.524,0.407-16.927,13.064-24.062c1.323-0.746,2.663-1.502,4.007-2.284c9.002-5.246,14.872-13.613,16.105-22.957C465.187,294.312,461.418,284.403,453.282,276.192z M297.09,41.995c6.396,0,11.601,5.156,11.601,11.494v45.038c0,0.006-0.001,0.012-0.001,0.017c-0.036,6.301-5.239,11.427-11.599,11.427c-6.396,0-11.601-5.156-11.601-11.495V53.486C285.492,47.15,290.695,41.995,297.09,41.995z M240.291,43.476c0.009-6.33,5.213-11.479,11.601-11.479c6.395,0,11.599,5.156,11.599,11.495V88.48c0,6.338-5.203,11.494-11.599,11.494c-6.396,0-11.601-5.156-11.601-11.494V43.476z M195.092,33.494c0-6.338,5.204-11.494,11.601-11.494c6.396,0,11.599,5.156,11.599,11.494v33.237h-23.199V33.494z M161.493,31.997c6.396,0,11.599,5.156,11.599,11.495v23.239h-23.199V43.492C149.893,37.153,155.097,31.997,161.493,31.997z M116.999,253.169c0-22.697,6.98-44.858,19.807-63.42c3.694,4.569,7.741,8.825,12.101,12.732V331.17C129.183,311.047,116.999,283.506,116.999,253.169z M170.907,348.612V217.808c1.106,0.584,2.223,1.15,3.352,1.697c1.546,0.75,3.181,1.104,4.791,1.104c4.083,0,8.005-2.283,9.905-6.204c2.651-5.466,0.368-12.046-5.099-14.697c-29.867-14.481-49.166-45.044-49.166-77.862v-18.792c0-7.898,6.68-14.324,14.891-14.324h65.868c-2.549,10.472-8.952,22.989-23.069,22.989h-14.312c-6.075,0-11,4.925-11,11s4.925,11,11,11c17.75,0,32.191,14.35,32.191,31.989c0,6.075,4.925,11,11,11s11-4.925,11-11c0-15.252-6.38-29.045-16.622-38.873c5.357-3.574,9.819-8.353,13.359-13.872c6.005,5.584,14.054,9.011,22.895,9.011c6.335,0,12.265-1.759,17.328-4.809c6.042,8.926,16.281,14.807,27.871,14.807c3.923,0,7.691-0.683,11.198-1.927c-2.416,24.898-15.737,47.846-36.669,62.542c-4.973,3.491-6.173,10.351-2.683,15.323c2.141,3.05,5.55,4.681,9.013,4.681c2.183,0,4.389-0.648,6.311-1.998c0.618-0.434,1.224-0.882,1.831-1.327v139.346c-16.82,10.188-36.533,16.058-57.592,16.058S187.727,358.799,170.907,348.612z M339.998,253.169c0,30.336-12.183,57.877-31.907,77.999V187.808c1.791-2.322,3.482-4.714,5.075-7.164C330.317,200.723,339.998,226.629,339.998,253.169z"/>
+</g>
+</svg>`;
+
+    // CENTRE icon — flaticon-style "link-alt" placeholder, white line art on
+    // the Dodger Blue connector. (Per spec, the centre icon comes from
+    // flaticon's interface-icons set, not the local Icon Library.)
+    const ICON_LINK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="#FFFFFF">
+  <path d="M387,247.8c-5.6-5.6-14.7-5.6-20.3,0L237.1,377.4c-26.5,26.5-69.6,26.5-96.1,0c-26.5-26.5-26.5-69.6,0-96.1l129.6-129.6c5.6-5.6,5.6-14.7,0-20.3c-5.6-5.6-14.7-5.6-20.3,0L120.7,261c-37.7,37.7-37.7,99.2,0,136.9c37.7,37.7,99.2,37.7,136.9,0L387,268.1C392.6,262.5,392.6,253.4,387,247.8z"/>
+  <path d="M474.3,114.7c-37.7-37.7-99.2-37.7-136.9,0L208,244.1c-5.6,5.6-5.6,14.7,0,20.3c5.6,5.6,14.7,5.6,20.3,0L357.7,135c26.5-26.5,69.6-26.5,96.1,0c26.5,26.5,26.5,69.6,0,96.1L324.2,360.6c-5.6,5.6-5.6,14.7,0,20.3c5.6,5.6,14.7,5.6,20.3,0l129.6-129.6C512,213.9,512,152.3,474.3,114.7z"/>
+</svg>`;
+
+    function InlineSVG({ svg, style }) {
+      return <div style={style} dangerouslySetInnerHTML={{ __html: svg }} />;
+    }
+
+    // ─── Easing + helpers ────────────────────────────────────────────────────
+    const Easing = {
+      linear:         t => t,
+      easeOutQuad:    t => t * (2 - t),
+      easeInOutQuad:  t => t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2,
+      easeOutCubic:   t => 1 - Math.pow(1 - t, 3),
+      easeInOutCubic: t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2,
+      easeInOutQuint: t => t < 0.5 ? 16*t*t*t*t*t : 1 - Math.pow(-2*t + 2, 5) / 2,
+      easeOutBackSubtle: t => {
+        const c1 = 1.10, c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+      },
+    };
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const animate = ({ from = 0, to = 1, start = 0, end = 1, ease = Easing.easeInOutCubic }) => t => {
+      if (t <= start) return from;
+      if (t >= end)   return to;
+      return from + (to - from) * ease((t - start) / (end - start));
+    };
+
+    const TimelineContext = React.createContext({ time: 0, duration: 10 });
+    const useTime = () => React.useContext(TimelineContext).time;
+
+    // ─── Stage ───────────────────────────────────────────────────────────────
+    function Stage({ width = 1920, height = 1080, duration = 10, background = '#E6ECF2', children }) {
+      const [time, setTime]       = React.useState(0);
+      const [playing, setPlaying] = React.useState(true);
+      const [scale, setScale]     = React.useState(1);
+      const stageRef = React.useRef(null);
+      const rafRef   = React.useRef(null);
+      const lastTs   = React.useRef(null);
+
+      React.useEffect(() => {
+        const measure = () => {
+          if (!stageRef.current) return;
+          const w = stageRef.current.clientWidth;
+          const h = stageRef.current.clientHeight - 52;
+          setScale(Math.max(0.05, Math.min(w / width, h / height)));
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(stageRef.current);
+        window.addEventListener('resize', measure);
+        return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+      }, [width, height]);
+
+      React.useEffect(() => {
+        if (!playing) { lastTs.current = null; return; }
+        const step = (ts) => {
+          if (lastTs.current == null) lastTs.current = ts;
+          const dt = (ts - lastTs.current) / 1000;
+          lastTs.current = ts;
+          setTime(t => {
+            let next = t + dt;
+            if (next >= duration) next = next % duration;
+            return next;
+          });
+          rafRef.current = requestAnimationFrame(step);
+        };
+        rafRef.current = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(rafRef.current);
+      }, [playing, duration]);
+
+      React.useEffect(() => {
+        const onKey = (e) => {
+          if (e.code === 'Space') { e.preventDefault(); setPlaying(p => !p); }
+          else if (e.code === 'ArrowLeft')  setTime(t => clamp(t - (e.shiftKey ? 1 : 0.1), 0, duration));
+          else if (e.code === 'ArrowRight') setTime(t => clamp(t + (e.shiftKey ? 1 : 0.1), 0, duration));
+          else if (e.key === '0') setTime(0);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [duration]);
+
+      return (
+        <div ref={stageRef} style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#0a0a0a' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', minHeight: 0 }}>
+            <div style={{ width, height, background, position: 'relative', transform: `scale(${scale})`, transformOrigin: 'center', flexShrink: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
+              <TimelineContext.Provider value={{ time, duration }}>
+                {children}
+              </TimelineContext.Provider>
+            </div>
+          </div>
+          <PlaybackBar time={time} duration={duration} playing={playing} onPlayPause={() => setPlaying(p => !p)} onReset={() => setTime(0)} onSeek={setTime} />
+        </div>
+      );
+    }
+
+    function PlaybackBar({ time, duration, playing, onPlayPause, onReset, onSeek }) {
+      const trackRef = React.useRef(null);
+      const [drag, setDrag] = React.useState(false);
+      const pct = duration > 0 ? (time / duration) * 100 : 0;
+      const fmt = (t) => {
+        const m = Math.floor(t / 60), s = Math.floor(t % 60), cs = Math.floor((t * 100) % 100);
+        return `${m}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
+      };
+      const seek = (e) => {
+        const r = trackRef.current.getBoundingClientRect();
+        onSeek(clamp((e.clientX - r.left) / r.width, 0, 1) * duration);
+      };
+      React.useEffect(() => {
+        if (!drag) return;
+        const up = () => setDrag(false);
+        const mv = (e) => seek(e);
+        window.addEventListener('mouseup', up); window.addEventListener('mousemove', mv);
+        return () => { window.removeEventListener('mouseup', up); window.removeEventListener('mousemove', mv); };
+      }, [drag]);
+      const btn = { width: 28, height: 28, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#f6f4ef', cursor:'pointer', padding:0 };
+      const mono = 'ui-monospace, SFMono-Regular, monospace';
+      return (
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 16px', background:'rgba(20,20,20,0.92)', borderTop:'1px solid rgba(255,255,255,0.08)', width:'100%', maxWidth:680, alignSelf:'center', borderRadius:8, color:'#f6f4ef', fontFamily:'Inter,system-ui,sans-serif', userSelect:'none', flexShrink:0 }}>
+          <button onClick={onReset} title="Return to start" style={btn}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2v10M12 2L5 7l7 5V2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/></svg>
+          </button>
+          <button onClick={onPlayPause} title="Play/pause (space)" style={btn}>
+            {playing ? (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3" y="2" width="3" height="10" fill="currentColor"/><rect x="8" y="2" width="3" height="10" fill="currentColor"/></svg>) : (<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2l9 5-9 5V2z" fill="currentColor"/></svg>)}
+          </button>
+          <div style={{ fontFamily:mono, fontSize:12, fontVariantNumeric:'tabular-nums', width:64, textAlign:'right' }}>{fmt(time)}</div>
+          <div ref={trackRef} onMouseDown={(e)=>{setDrag(true);seek(e);}} style={{ flex:1, height:22, position:'relative', cursor:'pointer', display:'flex', alignItems:'center' }}>
+            <div style={{ position:'absolute', left:0, right:0, height:4, background:'rgba(255,255,255,0.12)', borderRadius:2 }}/>
+            <div style={{ position:'absolute', left:0, width:`${pct}%`, height:4, background:'#0496FF', borderRadius:2 }}/>
+            <div style={{ position:'absolute', left:`${pct}%`, top:'50%', width:12, height:12, marginLeft:-6, marginTop:-6, background:'#fff', borderRadius:6, boxShadow:'0 2px 4px rgba(0,0,0,0.4)' }}/>
+          </div>
+          <div style={{ fontFamily:mono, fontSize:12, fontVariantNumeric:'tabular-nums', width:64, color:'rgba(246,244,239,0.55)' }}>{fmt(duration)}</div>
+        </div>
+      );
+    }
+
+    // ─── Scene constants (measured directly from the supplied PNGs) ──────────
+    const FONT_STACK = "'Satoshi', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif";
+
+    // Hard-coded directly from the pixel-precise pill detection — both pills
+    // run at full width (540 px) for y=808..866 with rounded ends above and
+    // below. Centring against this exact bbox.
+    //   Left  pill: x=156..695, y=803..893  → centre (425.5, 848)
+    //   Right pill: x=1232..1771, y=803..893 → centre (1501.5, 848)
+    const LEFT_PILL_X   = 156;
+    const RIGHT_PILL_X  = 1232;
+    const PILL_TOP_Y    = 803;
+    const PILL_W        = 540;
+    const PILL_H        = 91;
+
+    const LEFT_FRAME_CX  = 425;
+    const RIGHT_FRAME_CX = 1501;
+
+    // Each frame's icon area sits above its pill — centre at (frame_cx, 540).
+    const SIDE_ICON_CY   = 540;
+    const SIDE_ICON_SIZE = 380;
+
+    // Middle_Base.png solid bbox: x=777..1148, y=270..949 (centre 962, 609).
+    const MIDDLE_CX = 962;
+    const MIDDLE_CY = 609;
+    const LINK_ICON_SIZE = 220;
+
+    // ─── Animation timings (10 s total, smooth easeInOut throughout) ─────────
+    // Phase 1a (0.0 – 2.0s): the platinum-blue Stage backdrop is already on
+    // screen; BG.png scales up from 0 → 1 from the centre.
+    const BG_START   = 0.00;
+    const BG_END     = 2.00;
+
+    // Phase 1b (1.20 – 2.90s): the centre Connector (Middle_Base + link icon)
+    // scales 0 → 1 AND rotates −180° → 0° in lockstep — both driven by the
+    // same eased progress so the rotation runs throughout the scale. Delayed
+    // ~1s after the BG begins so the backdrop establishes itself first.
+    const CONN_START = 1.20;
+    const CONN_END   = 2.90;
+
+    // Phase 2 (1.00 – 5.50s): side frames begin sliding in much earlier so
+    // the motion overlaps Phase 1 — the BG is still scaling and the centre
+    // connector is mid-rotation as the sides start drifting in from the
+    // edges. 4.5-second slide gives a long, near-linear motion across the
+    // full window. Pill text fades in at the very end of the slide.
+    const SIDES_START      = 1.00;
+    const SIDES_END        = 5.50;
+    const PILL_TEXT_START  = 4.50;
+    const PILL_TEXT_END    = 5.50;
+
+    // Phase 3 (3.0 – 10.0s): static composition.
+
+    // ─── Background (BG.png scales 0→1 from the centre, on top of the
+    // Platinum Blue stage backdrop) ──────────────────────────────────────────
+    function Background({ time }) {
+      const s = animate({
+        from: 0, to: 1.0,
+        start: BG_START, end: BG_END,
+        ease: Easing.easeInOutCubic,
+      })(time);
+      return (
+        <img src="Assets/BG.png" alt=""
+             style={{
+               position: 'absolute', inset: 0,
+               width: '100%', height: '100%', display: 'block',
+               transform: `scale(${s})`,
+               transformOrigin: 'center center',
+             }} />
+      );
+    }
+
+    // ─── Centre connector (Middle_Base + link icon, scale + 180° rotate) ─────
+    // Scale and rotation are driven by the SAME eased progress, so the
+    // rectangle rotates as it scales — not "scale then rotate".
+    function Connector({ time }) {
+      const prog  = clamp((time - CONN_START) / (CONN_END - CONN_START), 0, 1);
+      const eased = Easing.easeInOutCubic(prog);
+      const scale = eased;
+      const rotation = -180 + eased * 180;
+
+      return (
+        <div style={{
+          position: 'absolute', inset: 0,
+          transform: `rotate(${rotation}deg) scale(${scale})`,
+          transformOrigin: `${MIDDLE_CX}px ${MIDDLE_CY}px`,
+          opacity: prog > 0 ? 1 : 0,
+          pointerEvents: 'none',
+        }}>
+          <img src="Assets/Middle_Base.png" alt=""
+               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
+          <div style={{
+            position: 'absolute',
+            left: MIDDLE_CX - LINK_ICON_SIZE / 2,
+            top:  MIDDLE_CY - LINK_ICON_SIZE / 2,
+            width: LINK_ICON_SIZE, height: LINK_ICON_SIZE,
+          }}>
+            <InlineSVG svg={ICON_LINK_SVG} style={{ width: '100%', height: '100%' }} />
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Side frame (shell + icon + pill text, slides in) ────────────────────
+    function SideFrame({ time, side, shellAsset, iconSvg, pillText }) {
+      const isLeft = side === 'left';
+      const travelFrom = isLeft ? -1300 : 1300;
+      const slideX = animate({
+        from: travelFrom, to: 0,
+        start: SIDES_START, end: SIDES_END,
+        ease: Easing.easeInOutQuad,          // gentle near-linear motion so
+                                             // the slide is visible across the
+                                             // whole window, not bunched in
+                                             // the middle like quint
+      })(time);
+      const op = animate({
+        from: 0, to: 1,
+        start: SIDES_START, end: SIDES_START + 0.50,
+        ease: Easing.easeInOutCubic,
+      })(time);
+      const textOp = animate({
+        from: 0, to: 1,
+        start: PILL_TEXT_START, end: PILL_TEXT_END,
+        ease: Easing.easeInOutCubic,
+      })(time);
+
+      const frameCX = isLeft ? LEFT_FRAME_CX : RIGHT_FRAME_CX;
+      const pillX   = isLeft ? LEFT_PILL_X   : RIGHT_PILL_X;
+
+      return (
+        <div style={{
+          position: 'absolute', inset: 0,
+          transform: `translateX(${slideX}px)`,
+          opacity: op,
+          pointerEvents: 'none',
+        }}>
+          {/* Outlined shell (with footer pill baked in) */}
+          <img src={shellAsset} alt=""
+               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
+
+          {/* Library icon, centred above the pill */}
+          <div style={{
+            position: 'absolute',
+            left: frameCX - SIDE_ICON_SIZE / 2,
+            top:  SIDE_ICON_CY - SIDE_ICON_SIZE / 2,
+            width: SIDE_ICON_SIZE, height: SIDE_ICON_SIZE,
+          }}>
+            <InlineSVG svg={iconSvg} style={{ width: '100%', height: '100%' }} />
+          </div>
+
+          {/* Pill text — flex-centred wrapper sized to the pill's bbox; the
+              inner span uses `lineHeight: 1` so the line box hugs the glyphs
+              and flex centres the glyph block exactly in the pill. */}
+          <div style={{
+            position: 'absolute',
+            left: pillX, top: PILL_TOP_Y,
+            width: PILL_W, height: PILL_H,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: textOp,
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              color: '#FFFFFF',
+              fontFamily: FONT_STACK,
+              fontWeight: 700,                 // Satoshi Bold
+              fontSize: 37,
+              lineHeight: 1,
+              letterSpacing: '-0.005em',
+              whiteSpace: 'nowrap',
+              display: 'inline-block',
+              transform: 'translateY(-8px)',   // shift up — the previous ±2px
+                                               // optical correction wasn't
+                                               // visible in a 91px container
+            }}>
+              {pillText}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Scene ───────────────────────────────────────────────────────────────
+    function Scene() {
+      const t = useTime();
+      return (
+        <div style={{ position: 'absolute', inset: 0, background: '#E6ECF2', overflow: 'hidden' }}>
+          {/* Phase 1: BG scales up + centre connector rotates in */}
+          <Background time={t} />
+          <Connector  time={t} />
+
+          {/* Phase 2: side frames slide in (rendered after the connector so
+              they overlap with it during the slide-in if necessary). */}
+          <SideFrame
+            time={t}
+            side="left"
+            shellAsset="Assets/Left_Shell_Box.png"
+            iconSvg={ICON_VOCAB_SVG}
+            pillText="Paste Icon Title 1"
+          />
+          <SideFrame
+            time={t}
+            side="right"
+            shellAsset="Assets/Right_Shell_Box.png"
+            iconSvg={ICON_STRONG_MIND_SVG}
+            pillText="Paste Icon Title 2"
+          />
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <Stage width={1920} height={1080} duration={10} background="#E6ECF2">
+          <Scene />
+        </Stage>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
