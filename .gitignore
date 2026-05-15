@@ -1,1 +1,4 @@
 push_to_github.sh
+.DS_Store
+.claude/settings.local.json
+.claude/worktrees/
