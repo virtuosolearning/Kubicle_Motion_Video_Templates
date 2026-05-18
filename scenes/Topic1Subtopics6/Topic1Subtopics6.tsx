@@ -46,7 +46,10 @@ export const topic1Subtopics6Schema = z.object({
   details: z.array(z.string().min(1).max(45)).length(6),
   // Icon ID for the large left-panel anchor illustration. Matches a filename
   // in icons/ without the .svg extension (e.g. "edit", "analytics").
-  anchorIcon: z.string().min(1),
+  anchor: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
+    z.object({ kind: z.literal('character'), id: z.string().min(1) }),
+  ]),
   timings: topic1Subtopics6TimingsSchema.optional(),
 });
 
@@ -65,8 +68,10 @@ export const topic1Subtopics6Meta = {
     'BAD: "Understanding data modelling concepts" (too long). ' +
     'details is an array of exactly 6 items, each typing into its own pill row. ' +
     'Aim for parallel phrasing — noun phrases or short sentences, max 45 chars each. ' +
-    'anchorIcon is the icon ID for the large left-panel illustration; pick one from ' +
-    'the catalog\'s available_icons list. Default duration 300 frames (10 s).',
+    "anchor is a discriminated union: { kind: 'icon', id } renders " +
+    "icons/<id>.svg (520×520 line art); { kind: 'character', id } renders " +
+    'characters/<id>.png at 600×880 bottom-anchored (presenter-style). ' +
+    'Default duration 300 frames (10 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -101,6 +106,13 @@ const BULB_X    = 985;
 const ANCHOR_SIZE = 520;
 const ANCHOR_CX   = 432;
 const ANCHOR_CY   = 540;
+
+// Character bbox — larger than the icon so the presenter has card-height
+// presence on the no-panel platinum-blue background. Bottom-anchored.
+const CHAR_WIDTH  = 600;
+const CHAR_HEIGHT = 880;
+const CHAR_LEFT   = ANCHOR_CX - CHAR_WIDTH / 2;   // 132
+const CHAR_TOP    = 100;
 
 // Oxford Blue BG travel distance: slides in from the right.
 const NAVY_TRAVEL = 1080;
@@ -156,14 +168,16 @@ function BulbIcon({ size }: { size: number }) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+type AnchorProp = Topic1Subtopics6Props['anchor'];
+
 function AnchorIcon({
   frame,
-  icon,
+  anchor,
   iconFadeStart,
   iconFadeDur,
 }: {
   frame: number;
-  icon: string;
+  anchor: AnchorProp;
   iconFadeStart: number;
   iconFadeDur: number;
 }) {
@@ -173,22 +187,49 @@ function AnchorIcon({
     easing: cubicInOut,
   });
 
+  if (anchor.kind === 'icon') {
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: ANCHOR_CX - ANCHOR_SIZE / 2,
+          top:  ANCHOR_CY - ANCHOR_SIZE / 2,
+          width:  ANCHOR_SIZE,
+          height: ANCHOR_SIZE,
+          opacity,
+          pointerEvents: 'none',
+        }}
+      >
+        <Img
+          src={staticFile(`icons/${anchor.id}.svg`)}
+          alt=""
+          style={{ width: ANCHOR_SIZE, height: ANCHOR_SIZE }}
+        />
+      </div>
+    );
+  }
   return (
     <div
       style={{
         position: 'absolute',
-        left: ANCHOR_CX - ANCHOR_SIZE / 2,
-        top:  ANCHOR_CY - ANCHOR_SIZE / 2,
-        width:  ANCHOR_SIZE,
-        height: ANCHOR_SIZE,
+        left: CHAR_LEFT,
+        top:  CHAR_TOP,
+        width:  CHAR_WIDTH,
+        height: CHAR_HEIGHT,
         opacity,
         pointerEvents: 'none',
       }}
     >
       <Img
-        src={staticFile(`icons/${icon}.svg`)}
+        src={staticFile(`characters/${anchor.id}.png`)}
         alt=""
-        style={{ width: ANCHOR_SIZE, height: ANCHOR_SIZE }}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          objectPosition: '50% 100%',
+          display: 'block',
+        }}
       />
     </div>
   );
@@ -337,7 +378,7 @@ function DetailPill({
 export const Topic1Subtopics6: React.FC<Topic1Subtopics6Props> = ({
   mainTitle,
   details,
-  anchorIcon,
+  anchor,
   timings,
 }) => {
   const frame = useCurrentFrame();
@@ -385,7 +426,7 @@ export const Topic1Subtopics6: React.FC<Topic1Subtopics6Props> = ({
 
       <AnchorIcon
         frame={frame}
-        icon={anchorIcon}
+        anchor={anchor}
         iconFadeStart={ICON_FADE_START}
         iconFadeDur={ICON_FADE_DUR}
       />
@@ -410,4 +451,24 @@ export const Topic1Subtopics6: React.FC<Topic1Subtopics6Props> = ({
       ))}
     </AbsoluteFill>
   );
+};
+
+// ─── Demo / test props ────────────────────────────────────────────────────────
+
+export const topic1Subtopics6DefaultProps: Topic1Subtopics6Props = {
+  mainTitle: 'Data modelling',
+  anchor: { kind: 'icon', id: 'edit' },
+  details: [
+    'Define entities and relationships',
+    'Choose a normalisation level',
+    'Map primary and foreign keys',
+    'Validate against business rules',
+    'Review with stakeholders',
+    'Document the final schema',
+  ],
+};
+
+export const topic1Subtopics6CharacterDemoProps: Topic1Subtopics6Props = {
+  ...topic1Subtopics6DefaultProps,
+  anchor: { kind: 'character', id: 'presenter-grey' },
 };

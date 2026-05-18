@@ -43,13 +43,19 @@ export const timeline5TilesTimingsSchema = z
   })
   .partial();
 
+// Anchor accepts either an SVG icon or a character portrait PNG. The id is the
+// filename stem (no extension); resolved to icons/<id>.svg or characters/<id>.png.
+export const timeline5TilesAnchorSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
+  z.object({ kind: z.literal('character'), id: z.string().min(1) }),
+]);
+
 export const timeline5TilesSchema = z.object({
   // Exactly 5 step lines, ordered top → bottom. Bold white at 37 px in the
   // Satoshi family. ≤30 chars each so the typewriter completes in 1.3 s.
   steps: z.array(z.string().min(1).max(30)).length(5),
-  // Anchor icon ID for the left-panel illustration. Defaults to "video-lecture".
-  // The SVG should be patched white (matching the panel's dark background).
-  anchorIcon: z.string().min(1),
+  // Left-panel anchor: icon (line-art SVG) or character (portrait PNG).
+  anchor: timeline5TilesAnchorSchema,
   timings: timeline5TilesTimingsSchema.optional(),
 });
 
@@ -67,9 +73,11 @@ export const timeline5TilesMeta = {
     'Always supply exactly 5 steps in chronological order. Each is a short ' +
     'one-line description (Satoshi Bold 37 px white, ≤30 chars). Aim for ' +
     'parallel imperative phrasing. GOOD: "Plan the project scope". BAD: ' +
-    '"You should plan the project carefully" (too long). anchorIcon is the ' +
-    'icon id for the left panel — pick something that represents the overall ' +
-    'process (catalog has "video-lecture", "strategy", etc.). Default ' +
+    '"You should plan the project carefully" (too long). anchor is a ' +
+    "discriminated union: { kind: 'icon', id } renders icons/<id>.svg (540×540 " +
+    "line art on the dark left panel); { kind: 'character', id } renders " +
+    'characters/<id>.png fitted to the full panel (object-fit: contain, ' +
+    'bottom-anchored). Use pre-cut PNGs with transparent backgrounds. Default ' +
     'duration 450 frames (15 s).',
 } as const;
 
@@ -89,6 +97,15 @@ const SATOSHI_BOLD_SRC    = staticFile('fonts/Satoshi-Bold.woff2');
 const ICON_PANEL_CX = 428;
 const ICON_PANEL_CY = 535;
 const ICON_SIZE     = 540;
+
+// Character bbox — fills the panel (inset slightly from the bbox edges so the
+// subject sits comfortably inside the rounded corners). object-fit: contain
+// keeps the head visible at the top regardless of source aspect.
+const CHAR_LEFT   = 50;
+const CHAR_TOP    = 80;
+const CHAR_WIDTH  = 750;
+const CHAR_HEIGHT = 900;
+const CHAR_RADIUS = 40;
 
 // Loading bar bbox inside Container_right.png (and Loading_Bar_*.png).
 const LOAD_BAR_LEFT  = 1027;
@@ -177,16 +194,18 @@ function computeBarProgress(
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+type AnchorProp = Timeline5TilesProps['anchor'];
+
 function IconPanel({
   frame,
   splitStart,
   splitEnd,
-  anchorIcon,
+  anchor,
 }: {
   frame: number;
   splitStart: number;
   splitEnd: number;
-  anchorIcon: string;
+  anchor: AnchorProp;
 }) {
   const x = interpolate(frame, [splitStart, splitEnd], [-PANEL_TRAVEL, 0], {
     extrapolateLeft:  'clamp',
@@ -213,22 +232,49 @@ function IconPanel({
         alt=""
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
       />
-      <div
-        style={{
-          position: 'absolute',
-          left: ICON_PANEL_CX - ICON_SIZE / 2,
-          top:  ICON_PANEL_CY - ICON_SIZE / 2,
-          width:  ICON_SIZE,
-          height: ICON_SIZE,
-          opacity: iconOp,
-        }}
-      >
-        <Img
-          src={staticFile(`icons/${anchorIcon}.svg`)}
-          alt=""
-          style={{ width: ICON_SIZE, height: ICON_SIZE }}
-        />
-      </div>
+      {anchor.kind === 'icon' ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: ICON_PANEL_CX - ICON_SIZE / 2,
+            top:  ICON_PANEL_CY - ICON_SIZE / 2,
+            width:  ICON_SIZE,
+            height: ICON_SIZE,
+            opacity: iconOp,
+          }}
+        >
+          <Img
+            src={staticFile(`icons/${anchor.id}.svg`)}
+            alt=""
+            style={{ width: ICON_SIZE, height: ICON_SIZE }}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            position: 'absolute',
+            left: CHAR_LEFT,
+            top:  CHAR_TOP,
+            width:  CHAR_WIDTH,
+            height: CHAR_HEIGHT,
+            borderRadius: CHAR_RADIUS,
+            overflow: 'hidden',
+            opacity: iconOp,
+          }}
+        >
+          <Img
+            src={staticFile(`characters/${anchor.id}.png`)}
+            alt=""
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              objectPosition: '50% 100%',
+              display: 'block',
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -425,7 +471,7 @@ function Step({
 
 export const Timeline5Tiles: React.FC<Timeline5TilesProps> = ({
   steps,
-  anchorIcon,
+  anchor,
   timings,
 }) => {
   const frame = useCurrentFrame();
@@ -453,7 +499,7 @@ export const Timeline5Tiles: React.FC<Timeline5TilesProps> = ({
         frame={frame}
         splitStart={SPLIT_START}
         splitEnd={SPLIT_END}
-        anchorIcon={anchorIcon}
+        anchor={anchor}
       />
 
       <RightContainer
@@ -479,4 +525,22 @@ export const Timeline5Tiles: React.FC<Timeline5TilesProps> = ({
       ))}
     </AbsoluteFill>
   );
+};
+
+// ─── Demo / test props ────────────────────────────────────────────────────────
+
+export const timeline5TilesDefaultProps: Timeline5TilesProps = {
+  steps: [
+    'Plan the project scope',
+    'Draft the proposal',
+    'Get stakeholder sign-off',
+    'Build the first version',
+    'Ship and review',
+  ],
+  anchor: { kind: 'icon', id: 'video-lecture' },
+};
+
+export const timeline5TilesCharacterDemoProps: Timeline5TilesProps = {
+  ...timeline5TilesDefaultProps,
+  anchor: { kind: 'character', id: 'presenter-red' },
 };
