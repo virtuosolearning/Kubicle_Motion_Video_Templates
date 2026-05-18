@@ -49,7 +49,10 @@ export const rightPillsTicksV1Schema = z.object({
   // inside the dark pill, ≤30 chars to fit comfortably.
   responsibilities: z.array(z.string().min(1).max(30)).length(5),
   // Hero icon ID (e.g. "strategy"). Resolved to icons/<id>.svg.
-  heroIcon: z.string().min(1),
+  hero: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
+    z.object({ kind: z.literal('character'), id: z.string().min(1) }),
+  ]),
   timings: rightPillsTicksV1TimingsSchema.optional(),
 });
 
@@ -65,8 +68,9 @@ export const rightPillsTicksV1Meta = {
     'inside a dark pill — strict 30-char max, single line. Aim for parallel ' +
     'imperative phrasing. GOOD: "Define project scope", "Lead daily stand-ups". ' +
     'BAD: "It\'s your responsibility to define project scope" (too long). ' +
-    'heroIcon is the icon id for the left-side hero illustration; pick from ' +
-    'the catalog. Default duration 360 frames (12 s).',
+    "hero is a discriminated union: { kind: 'icon', id } renders icons/<id>.svg " +
+    "(520×520 line art on the left); { kind: 'character', id } renders " +
+    'characters/<id>.png at 600×880 bottom-anchored. Default duration 360 frames (12 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -96,6 +100,13 @@ const rowOffsetY = (n: number) => (FIRST_PILL_TOP + n * ROW_PITCH) - PILL_TOP;
 const HERO_SIZE = 520;
 const HERO_CX   = 425;
 const HERO_CY   = 540;
+
+// Character bbox — larger than the icon so the presenter has card-height
+// presence on the no-panel platinum-blue background. Bottom-anchored.
+const CHAR_WIDTH  = 600;
+const CHAR_HEIGHT = 880;
+const CHAR_LEFT   = HERO_CX - CHAR_WIDTH / 2;   // 125
+const CHAR_TOP    = 100;
 
 // Responsibility text.
 const TEXT_LEFT = 985;
@@ -298,7 +309,7 @@ function PillRow({
 
 export const RightPillsTicksV1: React.FC<RightPillsTicksV1Props> = ({
   responsibilities,
-  heroIcon,
+  hero,
   timings,
 }) => {
   const frame = useCurrentFrame();
@@ -331,24 +342,50 @@ export const RightPillsTicksV1: React.FC<RightPillsTicksV1Props> = ({
 
   return (
     <AbsoluteFill style={{ background: '#E6ECF2', overflow: 'hidden' }}>
-      {/* Phase 1 — hero icon fades in */}
-      <div
-        style={{
-          position: 'absolute',
-          left: HERO_CX - HERO_SIZE / 2,
-          top:  HERO_CY - HERO_SIZE / 2,
-          width:  HERO_SIZE,
-          height: HERO_SIZE,
-          opacity: heroOpacity,
-          pointerEvents: 'none',
-        }}
-      >
-        <Img
-          src={staticFile(`icons/${heroIcon}.svg`)}
-          alt=""
-          style={{ width: HERO_SIZE, height: HERO_SIZE, display: 'block' }}
-        />
-      </div>
+      {/* Phase 1 — hero fades in (icon OR character) */}
+      {hero.kind === 'icon' ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: HERO_CX - HERO_SIZE / 2,
+            top:  HERO_CY - HERO_SIZE / 2,
+            width:  HERO_SIZE,
+            height: HERO_SIZE,
+            opacity: heroOpacity,
+            pointerEvents: 'none',
+          }}
+        >
+          <Img
+            src={staticFile(`icons/${hero.id}.svg`)}
+            alt=""
+            style={{ width: HERO_SIZE, height: HERO_SIZE, display: 'block' }}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            position: 'absolute',
+            left: CHAR_LEFT,
+            top:  CHAR_TOP,
+            width:  CHAR_WIDTH,
+            height: CHAR_HEIGHT,
+            opacity: heroOpacity,
+            pointerEvents: 'none',
+          }}
+        >
+          <Img
+            src={staticFile(`characters/${hero.id}.png`)}
+            alt=""
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              objectPosition: '50% 100%',
+              display: 'block',
+            }}
+          />
+        </div>
+      )}
 
       {/* Phases 2 + 3 — 5 pill rows */}
       {[0, 1, 2, 3, 4].map(i => (
@@ -368,4 +405,22 @@ export const RightPillsTicksV1: React.FC<RightPillsTicksV1Props> = ({
       ))}
     </AbsoluteFill>
   );
+};
+
+// ─── Demo / test props ────────────────────────────────────────────────────────
+
+export const rightPillsTicksV1DefaultProps: RightPillsTicksV1Props = {
+  responsibilities: [
+    'Define project scope',
+    'Lead daily stand-ups',
+    'Review every pull request',
+    'Track blockers in real time',
+    'Share progress weekly',
+  ],
+  hero: { kind: 'icon', id: 'strategy' },
+};
+
+export const rightPillsTicksV1CharacterDemoProps: RightPillsTicksV1Props = {
+  ...rightPillsTicksV1DefaultProps,
+  hero: { kind: 'character', id: 'presenter-tie' },
 };

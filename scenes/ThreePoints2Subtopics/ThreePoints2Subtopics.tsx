@@ -59,7 +59,10 @@ export const threePoints2SubtopicsSchema = z.object({
   sections: z.array(sectionSchema).length(3),
   // Icon ID for the anchor on the left panel (e.g. "graphic"). Should be an
   // SVG patched to #E6ECF2 base + Dodger Blue accents.
-  anchorIcon: z.string().min(1),
+  anchor: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
+    z.object({ kind: z.literal('character'), id: z.string().min(1) }),
+  ]),
   timings: threePoints2SubtopicsTimingsSchema.optional(),
 });
 
@@ -77,7 +80,8 @@ export const threePoints2SubtopicsMeta = {
     'Bold white at 33 px, ≤45 chars each. Keep parallel structure across ' +
     'sections (e.g. all noun phrases). GOOD mainText: "Plan", "Build", "Ship". ' +
     'GOOD detailTexts: "Define entities and goals", "Map data flows". ' +
-    'BAD: long sentences — strip to noun phrases. anchorIcon is the icon id for ' +
+    "BAD: long sentences — strip to noun phrases. anchor is a discriminated union " +
+    "({ kind: 'icon', id } or { kind: 'character', id }) — id is the filename stem " +
     'the left frame; pick from the catalog. Default duration 450 frames (15 s).',
 } as const;
 
@@ -109,6 +113,14 @@ const SPLIT_TRAVEL = 1078;
 const PANEL_CX = 424;
 const PANEL_CY = 546;
 const PANEL_ICON_SIZE = 480;
+
+// Character bbox — fills the dark panel (slight inset from the 71..777 × 52..1040
+// solid bbox so the subject sits inside the rounded corners).
+const CHAR_LEFT   = 75;
+const CHAR_TOP    = 70;
+const CHAR_WIDTH  = 700;
+const CHAR_HEIGHT = 960;
+const CHAR_RADIUS = 40;
 
 // Right-side pill geometry (same x range for all three colours).
 const TITLE_LEFT  = 942;
@@ -376,7 +388,7 @@ function Section({
 
 export const ThreePoints2Subtopics: React.FC<ThreePoints2SubtopicsProps> = ({
   sections,
-  anchorIcon,
+  anchor,
   timings,
 }) => {
   const frame = useCurrentFrame();
@@ -432,28 +444,54 @@ export const ThreePoints2Subtopics: React.FC<ThreePoints2SubtopicsProps> = ({
         }}
       />
 
-      {/* Left icon frame (Icon_Base + anchor icon) */}
+      {/* Left icon frame (Icon_Base + anchor) */}
       <div style={{ position: 'absolute', inset: 0, opacity: frameOp, pointerEvents: 'none' }}>
         <Img
           src={ICON_BASE_SRC}
           alt=""
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
         />
-        <div
-          style={{
-            position: 'absolute',
-            left: PANEL_CX - PANEL_ICON_SIZE / 2,
-            top:  PANEL_CY - PANEL_ICON_SIZE / 2,
-            width:  PANEL_ICON_SIZE,
-            height: PANEL_ICON_SIZE,
-          }}
-        >
-          <Img
-            src={staticFile(`icons/${anchorIcon}.svg`)}
-            alt=""
-            style={{ width: PANEL_ICON_SIZE, height: PANEL_ICON_SIZE }}
-          />
-        </div>
+        {anchor.kind === 'icon' ? (
+          <div
+            style={{
+              position: 'absolute',
+              left: PANEL_CX - PANEL_ICON_SIZE / 2,
+              top:  PANEL_CY - PANEL_ICON_SIZE / 2,
+              width:  PANEL_ICON_SIZE,
+              height: PANEL_ICON_SIZE,
+            }}
+          >
+            <Img
+              src={staticFile(`icons/${anchor.id}.svg`)}
+              alt=""
+              style={{ width: PANEL_ICON_SIZE, height: PANEL_ICON_SIZE }}
+            />
+          </div>
+        ) : (
+          <div
+            style={{
+              position: 'absolute',
+              left: CHAR_LEFT,
+              top:  CHAR_TOP,
+              width:  CHAR_WIDTH,
+              height: CHAR_HEIGHT,
+              borderRadius: CHAR_RADIUS,
+              overflow: 'hidden',
+            }}
+          >
+            <Img
+              src={staticFile(`characters/${anchor.id}.png`)}
+              alt=""
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                objectPosition: '50% 100%',
+                display: 'block',
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Three colour sections */}
@@ -476,4 +514,29 @@ export const ThreePoints2Subtopics: React.FC<ThreePoints2SubtopicsProps> = ({
       ))}
     </AbsoluteFill>
   );
+};
+
+// ─── Demo / test props ────────────────────────────────────────────────────────
+
+export const threePoints2SubtopicsDefaultProps: ThreePoints2SubtopicsProps = {
+  sections: [
+    {
+      mainText:     'Plan',
+      detailTexts: ['Define the project scope', 'List the major risks early'],
+    },
+    {
+      mainText:     'Build',
+      detailTexts: ['Ship the first version fast', 'Iterate with real feedback'],
+    },
+    {
+      mainText:     'Launch',
+      detailTexts: ['Roll out to all users', 'Track adoption and outcomes'],
+    },
+  ],
+  anchor: { kind: 'icon', id: 'graphic' },
+};
+
+export const threePoints2SubtopicsCharacterDemoProps: ThreePoints2SubtopicsProps = {
+  ...threePoints2SubtopicsDefaultProps,
+  anchor: { kind: 'character', id: 'presenter-green' },
 };

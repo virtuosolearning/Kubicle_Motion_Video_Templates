@@ -26,14 +26,20 @@ import { z } from 'zod';
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
+// Anchor accepts either a line-art icon (rendered at 400×400) or a character
+// portrait PNG (rendered at 400×720, bottom-anchored — fills the upper card).
+const anchorSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
+  z.object({ kind: z.literal('character'), id: z.string().min(1) }),
+]);
+
 const cardSchema = z.object({
   // Header title — bold white, one line, ≤25 chars at 55 px.
   title:    z.string().min(1).max(25),
   // Body subtopic — types out beside the numbered sphere. ≤30 chars to fit.
   subtopic: z.string().min(1).max(30),
-  // Icon ID from icons/ (e.g. "document-folder", "analytics", "success").
-  // Renders pure white at 400×400 between title and pill.
-  icon:     z.string().min(1),
+  // Card anchor — icon OR character. Each card picks independently.
+  anchor:   anchorSchema,
 });
 
 // Optional per-render timing overrides. All values in SECONDS.
@@ -71,8 +77,10 @@ export const threeBigPointsV4Meta = {
     'BAD: "Plan the project carefully" (too long). subtopic is the typewriter ' +
     'body line beside the sphere (Satoshi Medium, 33 px) — strict 30-char max. ' +
     'GOOD: "Define entities and relationships". BAD: long sentences with ' +
-    'commas — keep noun phrases. icon is an id from the catalog (e.g. ' +
-    '"document-folder", "analytics", "success"). Default duration 300 frames ' +
+    'commas — keep noun phrases. anchor is a discriminated union per card: ' +
+    "{ kind: 'icon', id } renders icons/<id>.svg (400×400 line art); " +
+    "{ kind: 'character', id } renders characters/<id>.png at 400×720 " +
+    'bottom-anchored (fills upper card). Default duration 300 frames ' +
     '(10 s); the third card finishes around 8.5 s.',
 } as const;
 
@@ -104,6 +112,13 @@ const TITLE_TOP = 296;
 // Icon: 400×400, centred at (CARD_SRC_CX, 625).
 const ICON_SIZE = 400;
 const ICON_TOP  = 425;
+
+// Character bbox per card — sits BELOW the title, ends just above the
+// pill+sphere. object-fit: contain + bottom-anchor keeps the portrait's
+// aspect ratio and pushes the subject to the bottom of the box.
+const CHAR_WIDTH  = 400;
+const CHAR_HEIGHT = 520;
+const CHAR_TOP    = 380;
 // Subtopic position: right of the sphere, vertically centred on it.
 const SUBTOPIC_LEFT  = 232;
 const SUBTOPIC_WIDTH = 380;
@@ -257,23 +272,48 @@ function Card({
         {card.title}
       </div>
 
-      {/* Icon — large white line art, centred between title and pill */}
-      <div
-        style={{
-          position: 'absolute',
-          left: CARD_SRC_CX - ICON_SIZE / 2,
-          top:  ICON_TOP,
-          width:  ICON_SIZE,
-          height: ICON_SIZE,
-          opacity: contentOp,
-        }}
-      >
-        <Img
-          src={staticFile(`icons/${card.icon}.svg`)}
-          alt=""
-          style={{ width: ICON_SIZE, height: ICON_SIZE }}
-        />
-      </div>
+      {/* Anchor — icon (line art) OR character (portrait PNG) */}
+      {card.anchor.kind === 'icon' ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: CARD_SRC_CX - ICON_SIZE / 2,
+            top:  ICON_TOP,
+            width:  ICON_SIZE,
+            height: ICON_SIZE,
+            opacity: contentOp,
+          }}
+        >
+          <Img
+            src={staticFile(`icons/${card.anchor.id}.svg`)}
+            alt=""
+            style={{ width: ICON_SIZE, height: ICON_SIZE }}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            position: 'absolute',
+            left: CARD_SRC_CX - CHAR_WIDTH / 2,
+            top:  CHAR_TOP,
+            width:  CHAR_WIDTH,
+            height: CHAR_HEIGHT,
+            opacity: contentOp,
+          }}
+        >
+          <Img
+            src={staticFile(`characters/${card.anchor.id}.png`)}
+            alt=""
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              objectPosition: '50% 100%',
+              display: 'block',
+            }}
+          />
+        </div>
+      )}
 
       {/* Pill + sphere asset (rendered as-is, drop shadow baked in) */}
       <Img
@@ -378,4 +418,48 @@ export const ThreeBigPointsV4: React.FC<ThreeBigPointsV4Props> = ({ cards, timin
       ))}
     </AbsoluteFill>
   );
+};
+
+// ─── Demo / test props ────────────────────────────────────────────────────────
+
+export const threeBigPointsV4DefaultProps: ThreeBigPointsV4Props = {
+  cards: [
+    {
+      title:    'Plan',
+      subtopic: 'Map the project scope',
+      anchor:   { kind: 'icon', id: 'document-folder' },
+    },
+    {
+      title:    'Build',
+      subtopic: 'Ship a working first cut',
+      anchor:   { kind: 'icon', id: 'analytics' },
+    },
+    {
+      title:    'Launch',
+      subtopic: 'Roll out and measure',
+      anchor:   { kind: 'icon', id: 'success' },
+    },
+  ],
+};
+
+// Character demo — each of the 3 cards uses a different presenter portrait,
+// proving that per-card anchor kind can be chosen independently.
+export const threeBigPointsV4CharacterDemoProps: ThreeBigPointsV4Props = {
+  cards: [
+    {
+      title:    'Plan',
+      subtopic: 'Map the project scope',
+      anchor:   { kind: 'character', id: 'presenter-red' },
+    },
+    {
+      title:    'Build',
+      subtopic: 'Ship a working first cut',
+      anchor:   { kind: 'character', id: 'presenter-grey' },
+    },
+    {
+      title:    'Launch',
+      subtopic: 'Roll out and measure',
+      anchor:   { kind: 'character', id: 'presenter-green' },
+    },
+  ],
 };
