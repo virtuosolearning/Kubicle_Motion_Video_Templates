@@ -72,9 +72,12 @@ export type YinYang2PointsProps = z.infer<typeof yinYang2PointsSchema>;
 
 export const yinYang2PointsMeta = {
   description:
-    'Two-pane comparison: left navy panel with blue accent + 2 boxes, right ' +
-    'navy panel with pink accent + 2 boxes. Containers slide in from opposite ' +
-    'edges; icons then pulse in pair-by-pair as their box text fades.',
+    'Two-pane dichotomy: a navy panel with a blue accent bar holding a title + ' +
+    '2 icon-and-label boxes slides in from below, mirrored by a navy panel with ' +
+    'a pink accent bar on the right sliding down from above. Icons pulse in ' +
+    'pair-by-pair as their box text fades. Best for stark either/or contrasts ' +
+    'where each side has its own internal pair of examples — manual vs ' +
+    'automated, before vs after, problem vs solution, do this vs not that.',
   authoringNotes:
     'Always supply leftTitle, rightTitle (Inter ExtraBold 55.5 px Oxford Blue ' +
     'inside the coloured title bar — ≤40 chars). leftBoxes and rightBoxes are exactly ' +

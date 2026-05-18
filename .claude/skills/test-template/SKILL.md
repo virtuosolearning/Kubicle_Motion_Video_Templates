@@ -9,7 +9,7 @@ Render a video template to **three MP4 files of different durations** so the use
 
 ## Input
 
-A **Remotion `.tsx` scene** — a folder under `scenes/` containing `<Name>.tsx` plus the asset subfolders the scene resolves via `staticFile(...)` (e.g. `images/`, `icons/`, `fonts/`), or a direct path to the `.tsx` file. Example: `scenes/ThreeBigPointsV3/` or `scenes/ThreeBigPointsV3/ThreeBigPointsV3.tsx`.
+A **Remotion `.tsx` scene** — a folder under `scenes/` containing `<Name>.tsx` plus the asset subfolders the scene resolves via `staticFile(...)` (e.g. `images/`, `icons/`, `fonts/`), or a direct path to the `.tsx` file. Example: `scenes/Topic1Subtopics6/` or `scenes/Topic1Subtopics6/Topic1Subtopics6.tsx`.
 
 The component takes its data via props matching its exported zod schema; sample data should be inferred from schema constraints + any in-file authoring notes.
 
@@ -64,10 +64,10 @@ The `.tsx` in `scenes/<TemplateName>/` is the source of truth — don't re-port 
 1. **Copy the scene** verbatim into `$BENCH/src/<ComponentName>.tsx`. It will have a zod schema export, a meta export, and a top-level component that takes structured props (e.g. `points`, `cards`, `courseTitle`).
 2. **Write a thin `$BENCH/src/Scene.tsx` wrapper** that imports the component and supplies sample data conforming to its zod schema:
    ```tsx
-   import { OnePoint7Subtopics } from './OnePoint7Subtopics';
+   import { Topic1Subtopics6 } from './Topic1Subtopics6';
 
    export const Scene: React.FC<{ durationSeconds: number }> = () => (
-     <OnePoint7Subtopics
+     <Topic1Subtopics6
        mainTitle="Data modelling"
        anchorIcon="edit"
        details={[
