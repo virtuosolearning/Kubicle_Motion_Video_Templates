@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 // CharacterProfileCard — a Pinterest-style social-profile card used to
 // introduce a person with a short bio. Single centred white card, top-half
-// portrait, name + verified tick below, bio, followers/posts counts, and
+// portrait, workplace title + verified tick below, bio, followers/posts
 // a Follow pill on the right.
 //
 // Animation principles (in chronological order):
@@ -24,7 +24,7 @@ import { z } from 'zod';
 //   • Phase B (0.30–0.95 s): the portrait inside the card scales from
 //     0.92 → 1.0 with easeOutCubic — feels like the photo is settling
 //     into the frame.
-//   • Phase C (0.85–1.35 s): the name slides up 32 px while fading in.
+//   • Phase C (0.85–1.35 s): the title slides up 32 px while fading in.
 //     Easing: easeOutCubic.
 //   • Phase D (1.00–1.30 s): the verified badge pops in with
 //     easeOutBack (back constant 2.4) — a little tap of overshoot
@@ -61,9 +61,10 @@ export const characterProfileCardTimingsSchema = z
 export const characterProfileCardSchema = z.object({
   // Character PNG id — resolves to characters/<id>.png. Ships with `daniel`.
   characterId: z.string().min(1),
-  // Display name — bold dark, ≤28 chars so the verified badge sits beside it.
-  name:        z.string().min(1).max(28),
-  // Shows a green tick after the name when true. Default true.
+  // Workplace title / role — bold dark, ≤30 chars so the verified badge
+  // sits beside it (e.g. "Product Strategist", "Founder & CEO").
+  title:       z.string().min(1).max(30),
+  // Shows a dodger-blue tick after the title when true. Default true.
   verified:    z.boolean().optional(),
   // Brief bio — medium grey, wraps to ~2 lines at ≤95 chars.
   bio:         z.string().min(1).max(95),
@@ -81,16 +82,18 @@ export type CharacterProfileCardProps = z.infer<
 export const characterProfileCardMeta = {
   description:
     'A modern Pinterest-style social-profile card introducing a character: ' +
-    'a centred white rounded card with a portrait on top, the name + green ' +
-    'verified badge below, a short bio, two stats (followers + posts), and ' +
-    'a Follow pill on the right. Use to introduce a course presenter, ' +
-    'panellist, or any single character with a bio line.',
+    'a centred white rounded card with a portrait on top, the workplace ' +
+    'title + dodger-blue verified badge below, a short bio, two stats ' +
+    '(followers + posts), and a Follow pill on the right. Use to introduce ' +
+    'a course presenter, panellist, or any single character by their role.',
   authoringNotes:
     'characterId is a PNG ID in characters/<id>.png — pick a head-to-waist ' +
-    'cut-out portrait. name ≤28 chars; bio ≤95 chars (wraps to ~2 lines). ' +
-    'followersCount + postsCount are ints; large values format with commas. ' +
-    'Default duration 450 frames (15 s @ 30 fps); animations complete in ' +
-    'the first ~2.7 s and the card then holds for the remainder.',
+    'cut-out portrait. title ≤30 chars — the character\'s workplace role ' +
+    '(e.g. "Product Strategist", "Founder & CEO", "Head of Design"), NOT ' +
+    'their personal name. bio ≤95 chars (wraps to ~2 lines). followersCount ' +
+    '+ postsCount are ints; large values format with commas. Default ' +
+    'duration 450 frames (15 s @ 30 fps); animations complete in the first ' +
+    '~2.7 s and the card then holds for the remainder.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -289,7 +292,7 @@ function slideUp(localFrame: number, dur: number, travel = 32) {
 
 export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
   characterId,
-  name,
+  title,
   verified = true,
   bio,
   followersCount,
@@ -423,7 +426,7 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
           />
         </div>
 
-        {/* NAME ROW (name + verified badge) */}
+        {/* TITLE ROW (workplace role + verified badge) */}
         <div
           style={{
             position: 'absolute',
@@ -446,7 +449,7 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
               lineHeight: 1,
             }}
           >
-            {name}
+            {title}
           </span>
           {verified && (
             <div
@@ -592,9 +595,9 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
 
 export const characterProfileCardDefaultProps: CharacterProfileCardProps = {
   characterId: 'daniel',
-  name: 'Daniel Carter',
+  title: 'Product Strategist',
   verified: true,
-  bio: 'Founder & product strategist. Helping early-stage teams ship faster.',
+  bio: 'Helping early-stage teams ship faster, sharper, and with confidence.',
   followersCount: 1248,
   postsCount: 86,
 };
