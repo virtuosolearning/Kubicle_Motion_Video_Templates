@@ -723,11 +723,11 @@ export const textThread2CharactersDefaultProps: TextThread2CharactersProps = {
     yOffset: 90,
   },
   messages: [
-    { side: 'left',  text: 'Hey — got 30 seconds? Quick gut check.' },
-    { side: 'right', text: 'Yeah, what\'s up?' },
-    { side: 'left',  text: 'Should we ship the new pricing on Friday or wait?' },
-    { side: 'right', text: 'Monday. Nobody wants a weekend firefight.' },
-    { side: 'left',  text: 'Fair. I\'ll line up the comms for Monday AM.' },
-    { side: 'right', text: 'Perfect — send the draft when you have it.' },
+    { side: 'left',  text: 'Quick check — are we still on track for sprint demo Friday?' },
+    { side: 'right', text: 'Yep. Two stories left, both in QA.' },
+    { side: 'left',  text: 'Nice. Need anything from me before then?' },
+    { side: 'right', text: 'Sign-off on the new dashboard mockups would help.' },
+    { side: 'left',  text: 'On it tonight — feedback by EOD tomorrow.' },
+    { side: 'right', text: 'Perfect, thanks Maya.' },
   ],
 };
