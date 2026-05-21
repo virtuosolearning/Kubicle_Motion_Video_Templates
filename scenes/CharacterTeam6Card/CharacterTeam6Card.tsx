@@ -623,12 +623,12 @@ export const characterTeam6CardDefaultProps: CharacterTeam6CardProps = {
   // All PNGs are square (1024 or 1254), so a single characterHeight
   // (~620) gives consistent head sizes across the team.
   characters: [
-    { characterId: 'maya',    characterHeight: 620, characterY: 0, characterTitle: 'Product Lead' },
-    { characterId: 'jordan',  characterHeight: 620, characterY: 0, characterTitle: 'Engineer' },
-    { characterId: 'zara',    characterHeight: 620, characterY: 0, characterTitle: 'Designer' },
-    { characterId: 'richard', characterHeight: 620, characterY: 0, characterTitle: 'Founder' },
-    { characterId: 'emma',    characterHeight: 620, characterY: 0, characterTitle: 'Researcher' },
-    { characterId: 'marcus',  characterHeight: 620, characterY: 0, characterTitle: 'Operations' },
+    { characterId: 'amelia', characterHeight: 620, characterY: 0, characterTitle: 'Product Lead' },
+    { characterId: 'ken',    characterHeight: 620, characterY: 0, characterTitle: 'Engineer' },
+    { characterId: 'sarah',  characterHeight: 620, characterY: 0, characterTitle: 'Designer' },
+    { characterId: 'robert', characterHeight: 620, characterY: 0, characterTitle: 'Founder' },
+    { characterId: 'claire', characterHeight: 620, characterY: 0, characterTitle: 'Researcher' },
+    { characterId: 'rebecca', characterHeight: 620, characterY: 0, characterTitle: 'Operations' },
   ],
   title:    'Founding Team',
   verified: true,
