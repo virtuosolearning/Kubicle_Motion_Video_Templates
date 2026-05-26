@@ -34,6 +34,13 @@ export const bigPoints3V1TimingsSchema = z
     iconAnimEnd:         z.number().positive(),
     barFillStart:        z.number().nonnegative(),
     barFillEnd:          z.number().positive(),
+    // Two percentages (0..100) where the loading bar pauses so the narrator
+    // can talk about each point. Defaults [33, 66] — roughly between
+    // column 1/2 and column 2/3.
+    barPauseStops:       z.array(z.number().min(0).max(100)).length(2),
+    // How long each of the two pauses lasts (seconds). Set to 0 to keep
+    // the original continuous-sweep behaviour.
+    barPauseDuration:    z.number().nonnegative(),
     pillStarts:          z.array(z.number().nonnegative()).length(3),
     pillDuration:        z.number().positive(),
   })
@@ -86,6 +93,10 @@ const INTER_EXTRABOLD_SRC  = staticFile('fonts/Inter-ExtraBold.woff2');
 
 // Column centres at equal thirds of the 1920-wide canvas.
 const COL_CX = [360, 961, 1562] as const;
+// Whole composition is shifted up by this many pixels to vertically centre
+// the panel + loading-bar artwork on the canvas (the source PNGs are biased
+// a bit low). Negative values move content upward.
+const VERTICAL_OFFSET = -60;
 // Icon visual size — prototype renders at 165 px then scales 2.45×.
 const ICON_SZ = 404;
 // Icon vertical centre — 55% down the container (670) shifted up 96 px per the prototype.
@@ -116,10 +127,11 @@ const f   = (s: number) => Math.round(s * FPS);
 //   0.50    icons fade + scale start
 //   0.93    icons fade + scale end
 //   0.60    loading bar fill begins sweep
-//   9.50    loading bar fill reaches 100%
-//   1.40    pill 1 pop-in
-//   3.90    pill 2 pop-in
-//   7.20    pill 3 pop-in
+//   2.57    loading bar reaches first pause stop (33%) — pill 1 pops
+//   4.07    bar pause 1 ends, sweep resumes
+//   6.04    loading bar reaches second pause stop (66%) — pill 2 pops
+//   7.54    bar pause 2 ends, sweep resumes
+//   9.50    loading bar fill reaches 100% — pill 3 pops
 const DEFAULT_TIMINGS = {
   containerFadeStart: 0.10,
   containerFadeEnd:   0.57,
@@ -130,7 +142,10 @@ const DEFAULT_TIMINGS = {
   iconAnimEnd:        0.93,
   barFillStart:       0.60,
   barFillEnd:         9.50,
-  pillStarts: [1.40, 3.90, 7.20] as readonly number[],
+  barPauseStops:      [33, 66] as readonly number[],
+  barPauseDuration:   1.50,
+  // Pill pop times line up with the bar arriving at each stop.
+  pillStarts: [2.57, 6.04, 9.50] as readonly number[],
   pillDuration:       0.47,
 } as const;
 
@@ -308,6 +323,8 @@ export const BigPoints3V1: React.FC<BigPoints3V1Props> = ({ points, timings }) =
   const ICON_ANIM_END        = f(t.iconAnimEnd);
   const BAR_FILL_START       = f(t.barFillStart);
   const BAR_FILL_END         = f(t.barFillEnd);
+  const BAR_PAUSE_STOPS      = [...t.barPauseStops] as readonly number[];
+  const BAR_PAUSE_DURATION   = f(t.barPauseDuration);
   const PILL_STARTS          = t.pillStarts.map(f);
   const PILL_DURATION        = f(t.pillDuration);
 
@@ -329,26 +346,78 @@ export const BigPoints3V1: React.FC<BigPoints3V1Props> = ({ points, timings }) =
     extrapolateRight: 'clamp',
   });
 
-  // Loading bar fill — linear sweep, expressed as right-clip percentage.
-  const barFillPct = interpolate(frame, [BAR_FILL_START, BAR_FILL_END], [0, 100], {
-    extrapolateLeft:  'clamp',
-    extrapolateRight: 'clamp',
-  });
+  // Loading bar fill — piecewise sweep with two hold segments so the narrator
+  // can talk about each point. The total span [BAR_FILL_START, BAR_FILL_END]
+  // is split into 3 sweeps and 2 pauses, with sweep durations proportional
+  // to the distance between stops.
+  //
+  //   sweep 1: 0%             → barPauseStops[0]    (e.g. 0 → 33)
+  //   hold:                     barPauseStops[0]    (BAR_PAUSE_DURATION frames)
+  //   sweep 2: barPauseStops[0] → barPauseStops[1]  (e.g. 33 → 66)
+  //   hold:                     barPauseStops[1]    (BAR_PAUSE_DURATION frames)
+  //   sweep 3: barPauseStops[1] → 100%              (e.g. 66 → 100)
+  const TOTAL_SPAN  = BAR_FILL_END - BAR_FILL_START;
+  const SWEEP_BUDGET = Math.max(0, TOTAL_SPAN - 2 * BAR_PAUSE_DURATION);
+  const seg1Pct = BAR_PAUSE_STOPS[0]!;
+  const seg2Pct = BAR_PAUSE_STOPS[1]! - BAR_PAUSE_STOPS[0]!;
+  const seg3Pct = 100 - BAR_PAUSE_STOPS[1]!;
+  const segSum  = seg1Pct + seg2Pct + seg3Pct || 1;
+  const SWEEP_1 = Math.round((seg1Pct / segSum) * SWEEP_BUDGET);
+  const SWEEP_2 = Math.round((seg2Pct / segSum) * SWEEP_BUDGET);
+  const SWEEP_3 = SWEEP_BUDGET - SWEEP_1 - SWEEP_2;
+
+  // Anchor keyframes (in frame units, absolute on the timeline).
+  const k0 = BAR_FILL_START;
+  const k1 = k0 + SWEEP_1;
+  const k2 = k1 + BAR_PAUSE_DURATION;
+  const k3 = k2 + SWEEP_2;
+  const k4 = k3 + BAR_PAUSE_DURATION;
+  const k5 = k4 + SWEEP_3;
+
+  const barFillPct = interpolate(
+    frame,
+    [k0, k1, k2, k3, k4, k5],
+    [0, BAR_PAUSE_STOPS[0]!, BAR_PAUSE_STOPS[0]!, BAR_PAUSE_STOPS[1]!, BAR_PAUSE_STOPS[1]!, 100],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
   const rightClip = (100 - barFillPct).toFixed(2);
 
-  // Icons — fade + easeOutBack scale.
-  const iconOpacity = interpolate(frame, [ICON_ANIM_START, ICON_ANIM_END], [0, 1], {
-    extrapolateLeft:  'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const iconScale = interpolate(frame, [ICON_ANIM_START, ICON_ANIM_END], [0.55, 1], {
-    extrapolateLeft:  'clamp',
-    extrapolateRight: 'clamp',
-    easing: easeOutBack,
-  });
+  // ─── Per-column arrival frames ────────────────────────────────────────────
+  // The loading bar's leading edge sits at canvas X = 1920 × barFillPct/100
+  // (the bar PNG is canvas-wide and clipped from the right). Each icon sits
+  // at COL_CX[i] on the 1920-wide canvas, so the bar is "directly above"
+  // icon i when barFillPct = COL_CX[i] / 19.2. Invert the piecewise sweep
+  // to find the frame where that target % is reached. Both the icon scale-
+  // in and the pill scale-in are then keyed off this arrival frame instead
+  // of the user-supplied PILL_STARTS — so they pop together exactly when
+  // the bar passes over them.
+  const colArrivalFrame = (cx: number): number => {
+    const target = (cx / 1920) * 100;
+    const s0 = BAR_PAUSE_STOPS[0]!;
+    const s1 = BAR_PAUSE_STOPS[1]!;
+    if (target <= s0) {
+      return k0 + (target / s0) * (k1 - k0);
+    } else if (target <= s1) {
+      return k2 + ((target - s0) / (s1 - s0)) * (k3 - k2);
+    } else {
+      return k4 + ((target - s1) / (100 - s1)) * (k5 - k4);
+    }
+  };
+  const COL_ARRIVAL = COL_CX.map(colArrivalFrame);
+  // Override PILL_STARTS so each pill pops in lockstep with its icon.
+  const PILL_ARRIVAL = COL_ARRIVAL;
+
+  // Icons — per-column easeOutBack scale + fade, triggered as the bar's
+  // leading edge passes over that column. The actual interpolation happens
+  // inline in the points.map below; ICON_ANIM_DUR sets the window length.
+  const ICON_ANIM_DUR = ICON_ANIM_END - ICON_ANIM_START;
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#E6ECF2', overflow: 'hidden' }}>
+      {/* Vertical-centre nudge — the panel + loading-bar artwork sit slightly
+          low in the original PNGs. Shift the whole composition up by
+          VERTICAL_OFFSET px so it reads as visually centred on the canvas. */}
+      <AbsoluteFill style={{ transform: `translateY(${VERTICAL_OFFSET}px)` }}>
       {/* Oxford Blue container — scales up from centre */}
       <AbsoluteFill
         style={{
@@ -382,11 +451,24 @@ export const BigPoints3V1: React.FC<BigPoints3V1Props> = ({ points, timings }) =
       {/* Icons and pills — one per column */}
       {points.map(({ icon, label }, i) => {
         const cx = COL_CX[i]!;
+        const arrival = COL_ARRIVAL[i]!;
 
-        // Sine pulse triggered as this column's pill reveals — peaks at +8 %
+        // Per-column icon fade + easeOutBack scale, kicked off when the
+        // loading bar's leading edge passes directly over the icon.
+        const iconOpacity = interpolate(frame, [arrival, arrival + ICON_ANIM_DUR], [0, 1], {
+          extrapolateLeft:  'clamp',
+          extrapolateRight: 'clamp',
+        });
+        const iconScale = interpolate(frame, [arrival, arrival + ICON_ANIM_DUR], [0.55, 1], {
+          extrapolateLeft:  'clamp',
+          extrapolateRight: 'clamp',
+          easing: easeOutBack,
+        });
+
+        // Sine pulse triggered at the same arrival moment — peaks at +8 %
         // halfway through the 0.45 s bump, returns to 1 cleanly.
         const pulseDur = f(PULSE_DUR_S);
-        const pulseProg = interpolate(frame, [PILL_STARTS[i]!, PILL_STARTS[i]! + pulseDur], [0, 1], {
+        const pulseProg = interpolate(frame, [arrival, arrival + pulseDur], [0, 1], {
           extrapolateLeft:  'clamp',
           extrapolateRight: 'clamp',
         });
@@ -413,12 +495,13 @@ export const BigPoints3V1: React.FC<BigPoints3V1Props> = ({ points, timings }) =
             <AnimPill
               label={label}
               cx={cx}
-              startFrame={PILL_STARTS[i]!}
+              startFrame={PILL_ARRIVAL[i]!}
               pillDuration={PILL_DURATION}
             />
           </AbsoluteFill>
         );
       })}
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };
