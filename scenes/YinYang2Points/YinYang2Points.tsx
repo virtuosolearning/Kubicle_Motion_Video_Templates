@@ -89,12 +89,12 @@ export const yinYang2PointsMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BASE_1_SRC          = staticFile('images/base_1.png');
-const BASE_2_SRC          = staticFile('images/base_2.png');
-const BASE_1_BOXES_SRC    = staticFile('images/base_1_two_boxes.png');
-const BASE_2_BOXES_SRC    = staticFile('images/base_2_two_boxes.png');
-const TITLE1_BOX_SRC      = staticFile('images/title1_box.png');
-const TITLE2_BOX_SRC      = staticFile('images/title2_box.png');
+const BASE_1_SRC          = staticFile('Template-Specific-Assets/base_1.png');
+const BASE_2_SRC          = staticFile('Template-Specific-Assets/base_2.png');
+const BASE_1_BOXES_SRC    = staticFile('Template-Specific-Assets/base_1_two_boxes.png');
+const BASE_2_BOXES_SRC    = staticFile('Template-Specific-Assets/base_2_two_boxes.png');
+const TITLE1_BOX_SRC      = staticFile('Template-Specific-Assets/title1_box.png');
+const TITLE2_BOX_SRC      = staticFile('Template-Specific-Assets/title2_box.png');
 const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
 const SATOSHI_BOLD_SRC    = staticFile('fonts/Satoshi-Bold.woff2');
 

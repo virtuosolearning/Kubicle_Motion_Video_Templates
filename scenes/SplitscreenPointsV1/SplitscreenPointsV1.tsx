@@ -81,9 +81,9 @@ export const splitscreenPointsV1Meta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BG_SRC          = staticFile('images/oxfordblue_splitscreen_bg.png');
-const PILL_LEFT_SRC   = staticFile('images/pill_left_side.png');
-const PILL_RIGHT_SRC  = staticFile('images/pill_right_side.png');
+const BG_SRC          = staticFile('Template-Specific-Assets/oxfordblue_splitscreen_bg.png');
+const PILL_LEFT_SRC   = staticFile('Template-Specific-Assets/pill_left_side.png');
+const PILL_RIGHT_SRC  = staticFile('Template-Specific-Assets/pill_right_side.png');
 const SATOSHI_BLACK_SRC  = staticFile('fonts/Satoshi-Black.woff2');
 const SATOSHI_MEDIUM_SRC = staticFile('fonts/Satoshi-Medium.woff2');
 

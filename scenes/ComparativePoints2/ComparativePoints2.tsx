@@ -76,10 +76,10 @@ export const comparativePoints2Meta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BG_SRC          = staticFile('images/bg.png');
-const MIDDLE_BASE_SRC = staticFile('images/middle_base.png');
-const LEFT_SHELL_SRC  = staticFile('images/left_shell_box.png');
-const RIGHT_SHELL_SRC = staticFile('images/right_shell_box.png');
+const BG_SRC          = staticFile('Template-Specific-Assets/bg.png');
+const MIDDLE_BASE_SRC = staticFile('Template-Specific-Assets/middle_base.png');
+const LEFT_SHELL_SRC  = staticFile('Template-Specific-Assets/left_shell_box.png');
+const RIGHT_SHELL_SRC = staticFile('Template-Specific-Assets/right_shell_box.png');
 const SATOSHI_BOLD_SRC = staticFile('fonts/Satoshi-Bold.woff2');
 
 // ─── Layout constants (lifted directly from the prototype) ────────────────────

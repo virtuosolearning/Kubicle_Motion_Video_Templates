@@ -66,8 +66,8 @@ export const lessonSummaryMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BG_SRC   = staticFile('images/lesson_summary_background.png');
-const PILL_SRC = staticFile('images/lesson_summary_pill.png');
+const BG_SRC   = staticFile('Template-Specific-Assets/lesson_summary_background.png');
+const PILL_SRC = staticFile('Template-Specific-Assets/lesson_summary_pill.png');
 
 // ─── Layout constants (lifted directly from the prototype) ────────────────────
 

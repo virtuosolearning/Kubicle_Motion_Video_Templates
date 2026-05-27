@@ -102,7 +102,7 @@ export const kubicleAIChatMeta = {
 
 const SATOSHI_BOLD_SRC   = staticFile('fonts/Satoshi-Bold.woff2');
 const SATOSHI_MEDIUM_SRC = staticFile('fonts/Satoshi-Medium.woff2');
-const KUBICLE_LOGO_SRC   = staticFile('images/kubicle-icon-white.png');
+const KUBICLE_LOGO_SRC   = staticFile('Template-Specific-Assets/kubicle-icon-white.png');
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 

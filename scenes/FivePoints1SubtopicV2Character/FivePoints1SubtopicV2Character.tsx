@@ -95,12 +95,12 @@ export const fivePoints1SubtopicV2CharacterMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const ICON_BASE_SRC        = staticFile('images/icon_base.png');
-const PILL_BASE_SRC        = staticFile('images/pill_base.png');
-const DOTTED_LINE_SRC      = staticFile('images/dotted_line_base.png');
-const BLUE_DOTTED_LINE_SRC = staticFile('images/blue_dotted_line_base.png');
-const TICK_BASE_SRC        = staticFile('images/tick_base.png');
-const TICK_SRC             = staticFile('images/tick.png');
+const ICON_BASE_SRC        = staticFile('Template-Specific-Assets/icon_base.png');
+const PILL_BASE_SRC        = staticFile('Template-Specific-Assets/pill_base.png');
+const DOTTED_LINE_SRC      = staticFile('Template-Specific-Assets/dotted_line_base.png');
+const BLUE_DOTTED_LINE_SRC = staticFile('Template-Specific-Assets/blue_dotted_line_base.png');
+const TICK_BASE_SRC        = staticFile('Template-Specific-Assets/tick_base.png');
+const TICK_SRC             = staticFile('Template-Specific-Assets/tick.png');
 const INTER_BOLD_SRC       = staticFile('fonts/Inter-Bold.woff2');
 const SATOSHI_REG_SRC      = staticFile('fonts/Satoshi-Regular.woff2');
 

@@ -67,7 +67,7 @@ export const cards5FallingMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const CARD_HEADER_SRC = staticFile('images/card_header.png');
+const CARD_HEADER_SRC = staticFile('Template-Specific-Assets/card_header.png');
 const INTER_BOLD_SRC  = staticFile('fonts/Inter-Bold.woff2');
 
 // ─── Layout constants (measured directly from the supplied PNGs) ─────────────

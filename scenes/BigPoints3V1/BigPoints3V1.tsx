@@ -82,10 +82,10 @@ export const bigPoints3V1Meta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const OXFORD_BLUE_SRC      = staticFile('images/oxford_blue_base.png');
-const PILL_SRC             = staticFile('images/pill_box.png');
-const LOADING_BAR_SRC      = staticFile('images/loading_bar.png');
-const LOADING_BAR_BASE_SRC = staticFile('images/loading_bar_base.png');
+const OXFORD_BLUE_SRC      = staticFile('Template-Specific-Assets/oxford_blue_base.png');
+const PILL_SRC             = staticFile('Template-Specific-Assets/pill_box.png');
+const LOADING_BAR_SRC      = staticFile('Template-Specific-Assets/loading_bar.png');
+const LOADING_BAR_BASE_SRC = staticFile('Template-Specific-Assets/loading_bar_base.png');
 const SATOSHI_BLACK_SRC    = staticFile('fonts/Satoshi-Black.woff2');
 const INTER_EXTRABOLD_SRC  = staticFile('fonts/Inter-ExtraBold.woff2');
 

@@ -72,8 +72,8 @@ export const wordDefinitionMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BANNER_SRC = staticFile('images/word_definition_banner.png');
-const ICON_PILL_SRC = staticFile('images/icon_pill.png');
+const BANNER_SRC = staticFile('Template-Specific-Assets/word_definition_banner.png');
+const ICON_PILL_SRC = staticFile('Template-Specific-Assets/icon_pill.png');
 const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
 const SATOSHI_MEDIUM_SRC  = staticFile('fonts/Satoshi-Medium.woff2');
 

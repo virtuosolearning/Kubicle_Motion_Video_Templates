@@ -78,9 +78,9 @@ export const topic1Subtopics6CharacterMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BG_SRC          = staticFile('images/oxford_blue_splitscreen_bg.png');
-const TITLE_PILL_SRC  = staticFile('images/title_pill.png');
-const PILL_OUTLINE_SRC = staticFile('images/pill_outline.png');
+const BG_SRC          = staticFile('Template-Specific-Assets/oxford_blue_splitscreen_bg.png');
+const TITLE_PILL_SRC  = staticFile('Template-Specific-Assets/title_pill.png');
+const PILL_OUTLINE_SRC = staticFile('Template-Specific-Assets/pill_outline.png');
 const SATOSHI_BOLD_SRC  = staticFile('fonts/Satoshi-Bold.woff2');
 const SATOSHI_BLACK_SRC = staticFile('fonts/Satoshi-Black.woff2');
 

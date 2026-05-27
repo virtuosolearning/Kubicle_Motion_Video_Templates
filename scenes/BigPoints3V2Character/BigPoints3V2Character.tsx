@@ -84,8 +84,8 @@ export const bigPoints3V2CharacterMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BASE_CONTAINER_SRC  = staticFile('images/base_container.png');
-const PILL_AND_SPHERE_SRC = staticFile('images/pill_and_sphere.png');
+const BASE_CONTAINER_SRC  = staticFile('Template-Specific-Assets/base_container.png');
+const PILL_AND_SPHERE_SRC = staticFile('Template-Specific-Assets/pill_and_sphere.png');
 const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
 const SATOSHI_MEDIUM_SRC  = staticFile('fonts/Satoshi-Medium.woff2');
 

@@ -87,18 +87,18 @@ export const points3Subtopics2Meta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BG_SRC        = staticFile('images/oxford_blue_splitscreen.png');
-const ICON_BASE_SRC = staticFile('images/icon_base.png');
+const BG_SRC        = staticFile('Template-Specific-Assets/oxford_blue_splitscreen.png');
+const ICON_BASE_SRC = staticFile('Template-Specific-Assets/icon_base.png');
 
 const TITLE_PILL_SRCS = {
-  blue:   staticFile('images/title_pill_dodger_blue.png'),
-  pink:   staticFile('images/title_pill_wild_strawberry.png'),
-  yellow: staticFile('images/title_pill_lemon_yellow.png'),
+  blue:   staticFile('Template-Specific-Assets/title_pill_dodger_blue.png'),
+  pink:   staticFile('Template-Specific-Assets/title_pill_wild_strawberry.png'),
+  yellow: staticFile('Template-Specific-Assets/title_pill_lemon_yellow.png'),
 } as const;
 const SHELL_SRCS = {
-  blue:   staticFile('images/pill_shell_dodger_blue.png'),
-  pink:   staticFile('images/pill_shell_wild_strawberry.png'),
-  yellow: staticFile('images/pill_shell_lemon_yellow.png'),
+  blue:   staticFile('Template-Specific-Assets/pill_shell_dodger_blue.png'),
+  pink:   staticFile('Template-Specific-Assets/pill_shell_wild_strawberry.png'),
+  yellow: staticFile('Template-Specific-Assets/pill_shell_lemon_yellow.png'),
 } as const;
 
 const SATOSHI_BLACK_SRC = staticFile('fonts/Satoshi-Black.woff2');

@@ -58,8 +58,8 @@ export const courseSummaryMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BANNER_SRC = staticFile('images/course_summary_banner.png');
-const PILL_SRC   = staticFile('images/course_summary_pill.png');
+const BANNER_SRC = staticFile('Template-Specific-Assets/course_summary_banner.png');
+const PILL_SRC   = staticFile('Template-Specific-Assets/course_summary_pill.png');
 const SATOSHI_BOLD_SRC = staticFile('fonts/Satoshi-Bold.woff2');
 
 // ─── Layout constants (lifted directly from the prototype) ────────────────────

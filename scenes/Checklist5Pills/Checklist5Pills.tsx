@@ -77,9 +77,9 @@ export const checklist5PillsMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const PILL_BASE_SRC   = staticFile('images/pill_base.png');
-const PILL_CIRCLE_SRC = staticFile('images/pill_circle.png');
-const TICK_SRC        = staticFile('images/tick.png');
+const PILL_BASE_SRC   = staticFile('Template-Specific-Assets/pill_base.png');
+const PILL_CIRCLE_SRC = staticFile('Template-Specific-Assets/pill_circle.png');
+const TICK_SRC        = staticFile('Template-Specific-Assets/tick.png');
 const SATOSHI_BOLD_SRC = staticFile('fonts/Satoshi-Bold.woff2');
 
 // ─── Layout constants (lifted directly from the prototype) ────────────────────

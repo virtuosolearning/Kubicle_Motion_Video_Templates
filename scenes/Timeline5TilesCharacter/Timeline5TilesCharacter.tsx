@@ -70,11 +70,11 @@ export const timeline5TilesCharacterMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const ICON_BASE_SRC      = staticFile('images/icon_base.png');
-const CONTAINER_SRC      = staticFile('images/container_right.png');
-const NUMBER_CIRCLE_SRC  = staticFile('images/number_circle_base.png');
-const LOAD_BAR_BASE_SRC  = staticFile('images/loading_bar_base.png');
-const LOAD_BAR_TOP_SRC   = staticFile('images/loading_bar_top.png');
+const ICON_BASE_SRC      = staticFile('Template-Specific-Assets/icon_base.png');
+const CONTAINER_SRC      = staticFile('Template-Specific-Assets/container_right.png');
+const NUMBER_CIRCLE_SRC  = staticFile('Template-Specific-Assets/number_circle_base.png');
+const LOAD_BAR_BASE_SRC  = staticFile('Template-Specific-Assets/loading_bar_base.png');
+const LOAD_BAR_TOP_SRC   = staticFile('Template-Specific-Assets/loading_bar_top.png');
 const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
 const SATOSHI_BOLD_SRC    = staticFile('fonts/Satoshi-Bold.woff2');
 

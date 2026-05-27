@@ -62,7 +62,7 @@ export const lessonGoalMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const STRIPE_SRC = staticFile('images/lesson_goal_stripe.png');
+const STRIPE_SRC = staticFile('Template-Specific-Assets/lesson_goal_stripe.png');
 const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
 const SATOSHI_MEDIUM_SRC  = staticFile('fonts/Satoshi-Medium.woff2');
 

@@ -70,7 +70,7 @@ export const circlePoints4Meta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BASE_CIRCLE_SRC = staticFile('images/base_circle.png');
+const BASE_CIRCLE_SRC = staticFile('Template-Specific-Assets/base_circle.png');
 const SATOSHI_BOLD_SRC = staticFile('fonts/Satoshi-Bold.woff2');
 
 // ─── Layout constants (lifted from the prototype) ─────────────────────────────

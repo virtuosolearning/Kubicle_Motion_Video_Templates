@@ -84,8 +84,8 @@ export const lessonTitleMeta = {
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const BG_SRC   = staticFile('images/lesson_title_background.png');
-const LOGO_SRC = staticFile('images/logo.png');
+const BG_SRC   = staticFile('Template-Specific-Assets/lesson_title_background.png');
+const LOGO_SRC = staticFile('Template-Specific-Assets/logo.png');
 const INTER_SEMIBOLD_SRC = staticFile('fonts/Inter-SemiBold.woff2');
 const INTER_BOLD_SRC     = staticFile('fonts/Inter-Bold.woff2');
 const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
