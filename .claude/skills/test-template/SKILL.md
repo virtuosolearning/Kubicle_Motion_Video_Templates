@@ -9,7 +9,7 @@ Render a video template to **three MP4 files of different durations** so the use
 
 ## Input
 
-A **Remotion `.tsx` scene** — a folder under `scenes/` containing `<Name>.tsx` plus the asset subfolders the scene resolves via `staticFile(...)` (e.g. `images/`, `icons/`, `fonts/`), or a direct path to the `.tsx` file. Example: `scenes/Topic1Subtopics6/` or `scenes/Topic1Subtopics6/Topic1Subtopics6.tsx`.
+A **Remotion `.tsx` scene** — a folder under `scenes/` containing `<Name>.tsx` plus the asset subfolders the scene resolves via `staticFile(...)` (e.g. `Template-Specific-Assets/`, `icons/`, `fonts/`), or a direct path to the `.tsx` file. Example: `scenes/Topic1Subtopics6/` or `scenes/Topic1Subtopics6/Topic1Subtopics6.tsx`.
 
 The component takes its data via props matching its exported zod schema; sample data should be inferred from schema constraints + any in-file authoring notes.
 
@@ -92,14 +92,14 @@ The `.tsx` in `scenes/<TemplateName>/` is the source of truth — don't re-port 
 
 ### 3. Copy assets into `$BENCH/public/`
 
-Wipe and repopulate `public/` so leftover files from a previous template don't get served. Assets are colocated under the scene folder in arbitrary subfolders that match the `staticFile(...)` paths the scene uses — e.g. `images/`, `icons/`, `fonts/`:
+Wipe and repopulate `public/` so leftover files from a previous template don't get served. Assets are colocated under the scene folder in arbitrary subfolders that match the `staticFile(...)` paths the scene uses — e.g. `Template-Specific-Assets/`, `icons/`, `fonts/`:
 
 ```bash
 rm -rf "$BENCH/public"
 mkdir -p "$BENCH/public"
 # Copy every asset subfolder the scene references. Inspect the .tsx for
 # staticFile(...) calls to know which subfolders to copy.
-cp -R "scenes/<TemplateName>/images" "$BENCH/public/" 2>/dev/null || true
+cp -R "scenes/<TemplateName>/Template-Specific-Assets" "$BENCH/public/" 2>/dev/null || true
 cp -R "scenes/<TemplateName>/icons"  "$BENCH/public/" 2>/dev/null || true
 cp -R "scenes/<TemplateName>/fonts"  "$BENCH/public/" 2>/dev/null || true
 ```

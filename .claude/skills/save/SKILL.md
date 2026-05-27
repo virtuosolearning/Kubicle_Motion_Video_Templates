@@ -40,20 +40,28 @@ It's **coherent** when everything ties to one thing, e.g.:
 
 **If coherent → skip to step 3.**
 
-**If messy → ask first.** List the groups in plain English with file counts. Example:
+**If messy → default to separate commits per group.** Don't ask first — just list the groups in plain English (so the user can see what's about to happen) and start working through them one at a time, each as its own commit + push to `main`. Order: cleanup commits (e.g. `.gitignore`, deleted junk files) first, then config (`.claude/`), then template/feature work in alphabetical order.
 
-> Looks like you've done a few separate things here:
->
-> 1. **Updated the `/save` skill** — `.claude/skills/save/SKILL.md`
-> 2. **Added a new template** — `New_Templates/podcast-intro/` (4 new files)
-> 3. **Tweaked the README** — `README.md`
->
-> Want to save all of this as one commit, save them as separate commits one after another, or just save some of it for now?
+Example narration:
 
-Then act on what they say:
-- **All together** → one commit + one push including everything.
-- **Separate commits** → loop: commit + push each group, in order. Each push lands on `main` immediately, so order matters (later commits build on earlier ones).
-- **Some of it** → only stage what they picked; the rest stays as uncommitted changes for later.
+> Looks like a few separate things here. Saving each as its own commit:
+>
+> 1. **.gitignore + .DS_Store cleanup**
+> 2. **`.claude/` config**
+> 3. **`scenes/Carousel5TilesV1/`**
+> 4. **`scenes/Flywheel4PetalsV1/`**
+> 5. ...
+>
+> **Save 1 of N** — staging .gitignore cleanup... committing... pushed `a1b2c3d` to `main`.
+>
+> ...
+
+**Only stop and ask** if you spot something risky in the messy state:
+- Sensitive-looking filename (`.env`, `*secret*`, `*credential*`, `*token*`, `*.pem`, `*.p12`, `*.key`) → stop, ask before staging it.
+- A group spans clearly unrelated *and* destructive-looking work (e.g. mass file deletion mixed with new features) → flag it before continuing.
+- The user explicitly said "save everything as one commit" earlier in the conversation → respect that, do one big commit.
+
+Otherwise: separate commits per group, no question prompt. The user can always interrupt mid-loop if they want a different grouping.
 
 ### 3. Stage what's being saved
 
@@ -117,7 +125,7 @@ Done. No URLs to click.
 - ❌ Don't skip hooks (`--no-verify`).
 - ❌ Don't silently include sensitive files.
 - ❌ Don't be terse — narrate each step so the user learns what's happening.
-- ❌ Don't commit "messy" working trees without asking first.
+- ❌ Don't bundle "messy" working trees into one commit by default — split them into per-group commits (see step 2).
 - ❌ Don't create `save/...` branches or PRs — pushes go straight to `main` in this repo.
 
 ## Example: clean run
@@ -134,27 +142,20 @@ Done. No URLs to click.
 >
 > ✅ Pushed `a1b2c3d` to `main`. Your work is live on GitHub.
 
-## Example: messy run
+## Example: messy run (auto-split, no prompt)
 
 > User: `/save`
 >
 > Claude:
 > Checking what's changed... (`git status --short`)
 >
-> Looks like a few separate things here:
+> A few separate things here — saving each as its own commit, pushed to `main` in order:
 >
-> 1. **Edited the `/save` skill** — `.claude/skills/save/SKILL.md`
-> 2. **New podcast intro template** — `New_Templates/podcast-intro/` (4 files)
+> 1. **`.claude/` config**
+> 2. **New podcast intro template** — `New_Templates/podcast-intro/`
 > 3. **README tweak** — `README.md`
 >
-> Want to save all of this as one commit, separate commits, or just some of it?
->
-> User: separate commits please
->
-> Claude:
-> Got it. Three commits, each pushed to `main` right after committing.
->
-> **Save 1 of 3** — staging the skill edit... committing as "Update /save to push direct to main"... pushed `a1b2c3d` to `main`.
+> **Save 1 of 3** — staging `.claude/`... committing as "Add Claude Code project config"... pushed `a1b2c3d` to `main`.
 >
 > **Save 2 of 3** — staging the new template... committing as "Add podcast intro template"... pushed `e4f5g6h` to `main`.
 >
