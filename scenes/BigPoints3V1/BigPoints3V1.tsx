@@ -22,7 +22,6 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 // Optional per-render timing overrides. All values in SECONDS.
-// pillStarts must contain exactly 3 entries (one per column).
 export const bigPoints3V1TimingsSchema = z
   .object({
     containerFadeStart:  z.number().nonnegative(),
@@ -34,20 +33,23 @@ export const bigPoints3V1TimingsSchema = z
     iconAnimEnd:         z.number().positive(),
     barFillStart:        z.number().nonnegative(),
     barFillEnd:          z.number().positive(),
-    // Two percentages (0..100) where the loading bar pauses so the narrator
-    // can talk about each point. Defaults [33, 66] — roughly between
-    // column 1/2 and column 2/3.
-    barPauseStops:       z.array(z.number().min(0).max(100)).length(2),
-    // How long each of the two pauses lasts (seconds). Set to 0 to keep
-    // the original continuous-sweep behaviour.
+    // Percentages (0..100) where the loading bar pauses so the narrator can
+    // talk about each point. Should hold (pointCount - 1) entries: 2 stops for
+    // 3 points (default ≈ [33, 67]), 1 stop for 2 points (default ≈ [50]).
+    // Omit to auto-compute evenly-spaced stops for the point count.
+    barPauseStops:       z.array(z.number().min(0).max(100)).min(1).max(2),
+    // How long each pause lasts (seconds). 0 = continuous sweep, no pauses.
     barPauseDuration:    z.number().nonnegative(),
-    pillStarts:          z.array(z.number().nonnegative()).length(3),
+    // Accepted for backward-compat but ignored — pill reveals are keyed to the
+    // loading bar's arrival at each column.
+    pillStarts:          z.array(z.number().nonnegative()),
     pillDuration:        z.number().positive(),
   })
   .partial();
 
 export const bigPoints3V1Schema = z.object({
-  // Exactly 3 points; layout is hard-coded to three equal columns.
+  // 2 or 3 points. The oxford-blue panel + loading bar shrink to fit the count
+  // and stay centred in frame (no negative space for the 2-point case).
   points: z
     .array(
       z.object({
@@ -58,7 +60,8 @@ export const bigPoints3V1Schema = z.object({
         label: z.string().min(1).max(25),
       }),
     )
-    .length(3),
+    .min(2)
+    .max(3),
   timings: bigPoints3V1TimingsSchema.optional(),
 });
 
@@ -66,40 +69,67 @@ export type BigPoints3V1Props = z.infer<typeof bigPoints3V1Schema>;
 
 export const bigPoints3V1Meta = {
   description:
-    'Three-column row on an oxford-blue base, each column holding a single bold ' +
-    'icon and a coloured pill caption beneath. A loading bar sweeps left → right ' +
-    'revealing the icons in turn, then the three caption pills pop in staggered. ' +
-    'Best for surfacing three top-level takeaways or features as a quick visual ' +
+    'A row of 2–3 columns on an oxford-blue base, each column holding a single ' +
+    'bold icon and a coloured pill caption beneath. A loading bar sweeps left → ' +
+    'right revealing the icons in turn, then the caption pills pop in staggered. ' +
+    'The panel and bar shrink to fit the column count and stay centred. Best for ' +
+    'surfacing two or three top-level takeaways or features as a quick visual ' +
     'recap with minimal supporting copy.',
   authoringNotes:
-    'Always supply exactly 3 points. icon is an id from the catalog\'s available_icons list ' +
-    '(e.g. "rocket", "idea", "money-bag"); unknown ids leave the slot empty. label is the ' +
-    'pill caption — strict 25-character max, one line at 34 px in Satoshi Black. ' +
-    'Write short noun phrases (2–4 words). GOOD: "Faster processing", "Real-time sync", ' +
-    '"Zero downtime". BAD: "Processes data faster", "Synchronise in real time" (too long — ' +
-    'trim to the core noun phrase). Default duration 300 frames (10 s).',
+    'Supply 2 or 3 points. The panel auto-sizes and centres for the count. icon is ' +
+    'an id from the catalog\'s available_icons list (e.g. "rocket", "idea", ' +
+    '"money-bag"); unknown ids leave the slot empty. label is the pill caption — ' +
+    'strict 25-character max, one line at 34 px in Satoshi Black. Write short noun ' +
+    'phrases (2–4 words). GOOD: "Faster processing", "Real-time sync", "Zero ' +
+    'downtime". BAD: "Processes data faster" (too long). Default duration 300 ' +
+    'frames (10 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const OXFORD_BLUE_SRC      = staticFile('Template-Specific-Assets/oxford_blue_base.png');
 const PILL_SRC             = staticFile('Template-Specific-Assets/pill_box.png');
-const LOADING_BAR_SRC      = staticFile('Template-Specific-Assets/loading_bar.png');
-const LOADING_BAR_BASE_SRC = staticFile('Template-Specific-Assets/loading_bar_base.png');
 const SATOSHI_BLACK_SRC    = staticFile('fonts/Satoshi-Black.woff2');
 const INTER_EXTRABOLD_SRC  = staticFile('fonts/Inter-ExtraBold.woff2');
 
-// ─── Layout constants (lifted verbatim from the prototype) ────────────────────
+// ─── Layout constants ─────────────────────────────────────────────────────────
+// The Oxford-blue panel and the loading bar used to be fixed 1920×1080 PNGs, so
+// the layout was locked to 3 columns. They are now drawn in CSS (colours +
+// geometry matched to the original artwork) so the panel can shrink to fit 2 or
+// 3 columns with no negative space and stay centred in frame.
 
-// Column centres at equal thirds of the 1920-wide canvas.
-const COL_CX = [360, 961, 1562] as const;
-// Whole composition is shifted up by this many pixels to vertically centre
-// the panel + loading-bar artwork on the canvas (the source PNGs are biased
-// a bit low). Negative values move content upward.
+// Per-column horizontal allocation, and the distance from the outer column
+// centres to the panel edge. Derived from the original 3-column artwork:
+//   panel x[59..1863] (w 1804); columns at 360 / 961 / 1562 → spacing 601;
+//   outer columns sit 301 px in from each panel edge.
+const COL_SPACING = 601;
+const COL_EDGE    = 301;
+const panelWidthFor = (n: number) => (n - 1) * COL_SPACING + 2 * COL_EDGE;
+const panelLeftFor  = (n: number) => Math.round((1920 - panelWidthFor(n)) / 2);
+const colCxFor      = (i: number, n: number) => panelLeftFor(n) + COL_EDGE + i * COL_SPACING;
+
+// Panel box (vertical position matches the original artwork; width is dynamic).
+const PANEL_TOP    = 274;
+const PANEL_HEIGHT = 733;
+const PANEL_RADIUS = 56;
+const PANEL_GRADIENT =
+  'linear-gradient(180deg, #052234 0%, #041C2C 45%, #02121C 100%)';
+const PANEL_SHADOW =
+  '0 40px 80px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.35)';
+
+// Loading bar — floats just above the panel top, inset from the panel sides.
+const BAR_TOP         = 205;
+const BAR_HEIGHT      = 51;
+const BAR_INSET       = 46;     // gap between each bar end and the panel side
+const BAR_TRACK_COLOR = '#052438';
+const BAR_FILL_GRADIENT =
+  'linear-gradient(180deg, #48B2FF 0%, #0496FF 100%)';
+
+// Whole composition shifts up so the panel + bar group reads as vertically
+// centred on the canvas.
 const VERTICAL_OFFSET = -60;
 // Icon visual size — prototype renders at 165 px then scales 2.45×.
 const ICON_SZ = 404;
-// Icon vertical centre — 55% down the container (670) shifted up 96 px per the prototype.
+// Icon vertical centre.
 const ICON_CY = 574;
 // Pulse triggered as each pill reveals — sine bump, ±8 % peak over 0.45 s.
 const PULSE_AMP = 0.08;
@@ -142,11 +172,10 @@ const DEFAULT_TIMINGS = {
   iconAnimEnd:        0.93,
   barFillStart:       0.60,
   barFillEnd:         9.50,
-  barPauseStops:      [33, 66] as readonly number[],
   barPauseDuration:   1.50,
-  // Pill pop times line up with the bar arriving at each stop.
-  pillStarts: [2.57, 6.04, 9.50] as readonly number[],
   pillDuration:       0.47,
+  // barPauseStops is intentionally NOT defaulted here — it depends on the point
+  // count and is auto-computed in the component (or taken from a caller override).
 } as const;
 
 const easeOutCubic = Easing.out(Easing.cubic);
@@ -312,7 +341,7 @@ export const BigPoints3V1: React.FC<BigPoints3V1Props> = ({ points, timings }) =
       .finally(() => continueRender(fontHandle));
   }, [fontHandle]);
 
-  // Merge caller-supplied overrides, then convert seconds → frames once.
+  // Merge caller-supplied timing overrides, then convert seconds → frames once.
   const t = { ...DEFAULT_TIMINGS, ...timings };
   const CONTAINER_FADE_START = f(t.containerFadeStart);
   const CONTAINER_FADE_END   = f(t.containerFadeEnd);
@@ -323,10 +352,16 @@ export const BigPoints3V1: React.FC<BigPoints3V1Props> = ({ points, timings }) =
   const ICON_ANIM_END        = f(t.iconAnimEnd);
   const BAR_FILL_START       = f(t.barFillStart);
   const BAR_FILL_END         = f(t.barFillEnd);
-  const BAR_PAUSE_STOPS      = [...t.barPauseStops] as readonly number[];
   const BAR_PAUSE_DURATION   = f(t.barPauseDuration);
-  const PILL_STARTS          = t.pillStarts.map(f);
   const PILL_DURATION        = f(t.pillDuration);
+
+  // ── Dynamic geometry for the column count (2 or 3) ─────────────────────────
+  const nCols      = points.length;
+  const PANEL_W    = panelWidthFor(nCols);
+  const PANEL_LEFT = panelLeftFor(nCols);
+  const COL_CX     = points.map((_, i) => colCxFor(i, nCols));
+  const BAR_LEFT   = PANEL_LEFT + BAR_INSET;
+  const BAR_WIDTH  = PANEL_W - 2 * BAR_INSET;
 
   // Container (Oxford Blue panel) — fade + scale-in.
   const containerOpacity = interpolate(frame, [CONTAINER_FADE_START, CONTAINER_FADE_END], [0, 1], {
@@ -340,113 +375,138 @@ export const BigPoints3V1: React.FC<BigPoints3V1Props> = ({ points, timings }) =
     easing: easeOutCubic,
   });
 
-  // Loading bar base (dark track).
+  // Loading bar track fade-in.
   const barBaseOpacity = interpolate(frame, [BAR_BASE_FADE_START, BAR_BASE_FADE_END], [0, 1], {
     extrapolateLeft:  'clamp',
     extrapolateRight: 'clamp',
   });
 
-  // Loading bar fill — piecewise sweep with two hold segments so the narrator
-  // can talk about each point. The total span [BAR_FILL_START, BAR_FILL_END]
-  // is split into 3 sweeps and 2 pauses, with sweep durations proportional
-  // to the distance between stops.
-  //
-  //   sweep 1: 0%             → barPauseStops[0]    (e.g. 0 → 33)
-  //   hold:                     barPauseStops[0]    (BAR_PAUSE_DURATION frames)
-  //   sweep 2: barPauseStops[0] → barPauseStops[1]  (e.g. 33 → 66)
-  //   hold:                     barPauseStops[1]    (BAR_PAUSE_DURATION frames)
-  //   sweep 3: barPauseStops[1] → 100%              (e.g. 66 → 100)
-  const TOTAL_SPAN  = BAR_FILL_END - BAR_FILL_START;
-  const SWEEP_BUDGET = Math.max(0, TOTAL_SPAN - 2 * BAR_PAUSE_DURATION);
-  const seg1Pct = BAR_PAUSE_STOPS[0]!;
-  const seg2Pct = BAR_PAUSE_STOPS[1]! - BAR_PAUSE_STOPS[0]!;
-  const seg3Pct = 100 - BAR_PAUSE_STOPS[1]!;
-  const segSum  = seg1Pct + seg2Pct + seg3Pct || 1;
-  const SWEEP_1 = Math.round((seg1Pct / segSum) * SWEEP_BUDGET);
-  const SWEEP_2 = Math.round((seg2Pct / segSum) * SWEEP_BUDGET);
-  const SWEEP_3 = SWEEP_BUDGET - SWEEP_1 - SWEEP_2;
+  // ── Loading-bar sweep (generalised for 2 or 3 columns) ─────────────────────
+  // The bar pauses at (nCols-1) stops so the narrator can talk about each point.
+  // Stops default to evenly-spaced positions (≈[50] for 2 cols, ≈[33,67] for 3)
+  // and a caller may override them. The sweep budget (total span minus pause
+  // time) is split across segments in proportion to their width. Pause
+  // keyframes are only inserted when the pause duration is > 0, so
+  // barPauseDuration: 0 yields a clean continuous sweep instead of crashing on
+  // duplicate keyframes.
+  const STOPS = (timings?.barPauseStops
+    ? [...timings.barPauseStops]
+    : Array.from({ length: nCols - 1 }, (_, j) => Math.round(((j + 1) / nCols) * 100))
+  )
+    .slice(0, Math.max(0, nCols - 1))
+    .map((s) => Math.max(0, Math.min(100, s)))
+    .sort((a, b) => a - b);
 
-  // Anchor keyframes (in frame units, absolute on the timeline).
-  const k0 = BAR_FILL_START;
-  const k1 = k0 + SWEEP_1;
-  const k2 = k1 + BAR_PAUSE_DURATION;
-  const k3 = k2 + SWEEP_2;
-  const k4 = k3 + BAR_PAUSE_DURATION;
-  const k5 = k4 + SWEEP_3;
+  const TOTAL_SPAN   = BAR_FILL_END - BAR_FILL_START;
+  const SWEEP_BUDGET = Math.max(1, TOTAL_SPAN - STOPS.length * BAR_PAUSE_DURATION);
+  const segPcts: number[] = [];
+  let prevPct = 0;
+  for (const s of STOPS) { segPcts.push(s - prevPct); prevPct = s; }
+  segPcts.push(100 - prevPct);
+  const segSum = segPcts.reduce((a, b) => a + b, 0) || 1;
+  const sweepFrames = segPcts.map((p) => Math.round((p / segSum) * SWEEP_BUDGET));
 
-  const barFillPct = interpolate(
-    frame,
-    [k0, k1, k2, k3, k4, k5],
-    [0, BAR_PAUSE_STOPS[0]!, BAR_PAUSE_STOPS[0]!, BAR_PAUSE_STOPS[1]!, BAR_PAUSE_STOPS[1]!, 100],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
-  const rightClip = (100 - barFillPct).toFixed(2);
-
-  // ─── Per-column arrival frames ────────────────────────────────────────────
-  // The loading bar's leading edge sits at canvas X = 1920 × barFillPct/100
-  // (the bar PNG is canvas-wide and clipped from the right). Each icon sits
-  // at COL_CX[i] on the 1920-wide canvas, so the bar is "directly above"
-  // icon i when barFillPct = COL_CX[i] / 19.2. Invert the piecewise sweep
-  // to find the frame where that target % is reached. Both the icon scale-
-  // in and the pill scale-in are then keyed off this arrival frame instead
-  // of the user-supplied PILL_STARTS — so they pop together exactly when
-  // the bar passes over them.
-  const colArrivalFrame = (cx: number): number => {
-    const target = (cx / 1920) * 100;
-    const s0 = BAR_PAUSE_STOPS[0]!;
-    const s1 = BAR_PAUSE_STOPS[1]!;
-    if (target <= s0) {
-      return k0 + (target / s0) * (k1 - k0);
-    } else if (target <= s1) {
-      return k2 + ((target - s0) / (s1 - s0)) * (k3 - k2);
-    } else {
-      return k4 + ((target - s1) / (100 - s1)) * (k5 - k4);
+  // Strictly-increasing keyframes: frame[] → fillPct[].
+  const kf: number[] = [BAR_FILL_START];
+  const kp: number[] = [0];
+  let fr = BAR_FILL_START;
+  for (let i = 0; i < segPcts.length; i++) {
+    fr += sweepFrames[i]!;
+    const pc = i < STOPS.length ? STOPS[i]! : 100;
+    kf.push(fr); kp.push(pc);
+    if (i < STOPS.length && BAR_PAUSE_DURATION > 0) {
+      fr += BAR_PAUSE_DURATION;
+      kf.push(fr); kp.push(pc);
     }
+  }
+  const barFillPct = interpolate(frame, kf, kp, {
+    extrapolateLeft:  'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  // ── Per-column arrival frames ──────────────────────────────────────────────
+  // The bar's leading edge sits at BAR_LEFT + BAR_WIDTH × fillPct/100. Column i
+  // (centre COL_CX[i]) is reached when the fill % equals
+  // (COL_CX[i] - BAR_LEFT) / BAR_WIDTH × 100. Invert the keyframes to find that
+  // frame; both the icon and pill pops key off it so they fire as the bar
+  // passes over the column.
+  const frameAtPct = (target: number): number => {
+    for (let i = 0; i < kf.length - 1; i++) {
+      const p0 = kp[i]!, p1 = kp[i + 1]!;
+      if (p1 === p0) continue; // pause segment — flat, skip
+      if (target <= p1 || i === kf.length - 2) {
+        return kf[i]! + ((target - p0) / (p1 - p0)) * (kf[i + 1]! - kf[i]!);
+      }
+    }
+    return kf[kf.length - 1]!;
   };
-  const COL_ARRIVAL = COL_CX.map(colArrivalFrame);
-  // Override PILL_STARTS so each pill pops in lockstep with its icon.
+  const COL_ARRIVAL = COL_CX.map((cx) =>
+    frameAtPct(Math.max(0, Math.min(100, ((cx - BAR_LEFT) / BAR_WIDTH) * 100))),
+  );
   const PILL_ARRIVAL = COL_ARRIVAL;
 
-  // Icons — per-column easeOutBack scale + fade, triggered as the bar's
-  // leading edge passes over that column. The actual interpolation happens
-  // inline in the points.map below; ICON_ANIM_DUR sets the window length.
+  // Icons — per-column easeOutBack scale + fade, triggered as the bar's leading
+  // edge passes over that column. ICON_ANIM_DUR sets the window length.
   const ICON_ANIM_DUR = ICON_ANIM_END - ICON_ANIM_START;
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#E6ECF2', overflow: 'hidden' }}>
-      {/* Vertical-centre nudge — the panel + loading-bar artwork sit slightly
-          low in the original PNGs. Shift the whole composition up by
-          VERTICAL_OFFSET px so it reads as visually centred on the canvas. */}
+      {/* Vertical-centre nudge so the panel + loading-bar group reads as
+          centred on the canvas. */}
       <AbsoluteFill style={{ transform: `translateY(${VERTICAL_OFFSET}px)` }}>
-      {/* Oxford Blue container — scales up from centre */}
-      <AbsoluteFill
+      {/* Oxford-blue panel (CSS) — width fits the column count, centred; scales in */}
+      <div
         style={{
+          position: 'absolute',
+          left: PANEL_LEFT,
+          top:  PANEL_TOP,
+          width:  PANEL_W,
+          height: PANEL_HEIGHT,
+          borderRadius: PANEL_RADIUS,
+          background: PANEL_GRADIENT,
+          boxShadow: PANEL_SHADOW,
           opacity: containerOpacity,
           transform: `scale(${containerScale})`,
           transformOrigin: 'center center',
         }}
-      >
-        <Img
-          src={OXFORD_BLUE_SRC}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          alt=""
-        />
-      </AbsoluteFill>
+      />
 
-      {/* Loading bar — dark base track */}
-      <AbsoluteFill style={{ opacity: barBaseOpacity }}>
-        <Img src={LOADING_BAR_BASE_SRC} style={{ width: '100%', height: '100%' }} alt="" />
-      </AbsoluteFill>
-
-      {/* Loading bar — blue fill, reveals left → right via clipPath */}
-      <AbsoluteFill
+      {/* Loading bar — dark track */}
+      <div
         style={{
+          position: 'absolute',
+          left: BAR_LEFT,
+          top:  BAR_TOP,
+          width:  BAR_WIDTH,
+          height: BAR_HEIGHT,
+          borderRadius: BAR_HEIGHT / 2,
+          background: BAR_TRACK_COLOR,
           opacity: barBaseOpacity,
-          clipPath: `inset(0 ${rightClip}% 0 0)`,
+        }}
+      />
+
+      {/* Loading bar — blue fill, reveals left → right by width */}
+      <div
+        style={{
+          position: 'absolute',
+          left: BAR_LEFT,
+          top:  BAR_TOP,
+          width:  BAR_WIDTH,
+          height: BAR_HEIGHT,
+          borderRadius: BAR_HEIGHT / 2,
+          overflow: 'hidden',
+          opacity: barBaseOpacity,
         }}
       >
-        <Img src={LOADING_BAR_SRC} style={{ width: '100%', height: '100%' }} alt="" />
-      </AbsoluteFill>
+        <div
+          style={{
+            width: `${barFillPct}%`,
+            height: '100%',
+            background: BAR_FILL_GRADIENT,
+            borderRadius: BAR_HEIGHT / 2,
+          }}
+        />
+      </div>
 
       {/* Icons and pills — one per column */}
       {points.map(({ icon, label }, i) => {
