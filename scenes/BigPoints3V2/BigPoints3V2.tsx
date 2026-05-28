@@ -21,8 +21,9 @@ import { z } from 'zod';
 //       1.55 – 2.40   subtopic types out character-by-character
 //   • Default composition length is 300 frames (10 s @ 30 fps).
 //
-// Icons are rendered "Pure White line art" — Oxford Blue root AND Dodger Blue
-// accents both forced to white. Patched at port time, see icons/ folder.
+// Icons are rendered "Pure White line art" — any source SVG (dark, light, or
+// coloured) is forced to white at runtime via a `brightness(0) invert(1)`
+// filter on the icon Img, so the icons/ assets need no pre-patching.
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -110,7 +111,10 @@ const SPHERE_W    = 84;
 const SPHERE_H    = 81;
 
 // Title position inside the card (centred horizontally on CARD_SRC_CX).
-const TITLE_TOP = 296;
+// Width is capped below the 569 px card body so long titles wrap onto a
+// second line instead of bleeding out over the platinum background.
+const TITLE_TOP   = 296;
+const TITLE_WIDTH = 500;
 // Icon: 400×400, centred at (CARD_SRC_CX, 625).
 const ICON_SIZE = 400;
 const ICON_TOP  = 425;
@@ -262,12 +266,15 @@ function Card({
           left: CARD_SRC_CX,
           top:  TITLE_TOP,
           transform: 'translateX(-50%)',
+          width: TITLE_WIDTH,
+          textAlign: 'center',
           color: '#FFFFFF',
           fontFamily: "'Inter', system-ui, sans-serif",
           fontWeight: 800,
           fontSize: 55,
+          lineHeight: 1.05,
           letterSpacing: '-0.01em',
-          whiteSpace: 'nowrap',
+          overflowWrap: 'break-word',
           opacity: contentOp,
         }}
       >
@@ -289,7 +296,10 @@ function Card({
           <Img
             src={staticFile(`icons/${card.anchor.id}.svg`)}
             alt=""
-            style={{ width: ICON_SIZE, height: ICON_SIZE }}
+            // Force any source icon (dark/light/coloured) to pure white:
+            // brightness(0) flattens every non-transparent pixel to black,
+            // invert(1) then flips it to white — alpha/line-art preserved.
+            style={{ width: ICON_SIZE, height: ICON_SIZE, filter: 'brightness(0) invert(1)' }}
           />
         </div>
       ) : (
@@ -365,8 +375,9 @@ function Card({
           fontFamily: "'Satoshi', system-ui, sans-serif",
           fontWeight: 500,
           fontSize: 33,
+          lineHeight: 1.15,
           letterSpacing: '-0.005em',
-          whiteSpace: 'nowrap',
+          overflowWrap: 'break-word',
           opacity: localFrame >= typeStart ? 1 : 0,
         }}
       >
