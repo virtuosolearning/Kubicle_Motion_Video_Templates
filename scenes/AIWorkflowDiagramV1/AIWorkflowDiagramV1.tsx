@@ -49,43 +49,50 @@ export const aiWorkflowNodeSchema = z.object({
   icon:  z.enum(ICON_IDS),
 });
 
+// A column is a vertical stack of 1–3 node boxes.
+export const aiWorkflowColumnSchema = z.array(aiWorkflowNodeSchema).min(1).max(3);
+
 export const aiWorkflowDiagramV1TimingsSchema = z
   .object({
     bgScaleDuration:   z.number().positive(),  // oxford-blue irises in over platinum
-    sourceStart:       z.number().nonnegative(),
+    sourceStart:       z.number().nonnegative(),// first column begins popping
     nodePopDuration:   z.number().positive(),
     connectorDraw:     z.number().positive(),
-    branchStagger:     z.number().positive(),
-    pulsePeriod:       z.number().positive(),  // seconds per data-packet cycle
-    pulseLoopStart:    z.number().nonnegative(),
+    branchStagger:     z.number().positive(),   // stagger between boxes in a column
+    pulsePeriod:       z.number().positive(),   // seconds per data-packet cycle
+    pulseLoopStart:    z.number().nonnegative(),// floor; auto-bumped past build end
   })
   .partial();
 
 export const aiWorkflowDiagramV1Schema = z.object({
-  source:   aiWorkflowNodeSchema,
-  router:   aiWorkflowNodeSchema,
-  branches: z.array(aiWorkflowNodeSchema).length(3),
-  sink:     aiWorkflowNodeSchema,
-  timings:  aiWorkflowDiagramV1TimingsSchema.optional(),
+  // 1–4 columns laid out left → right; each column holds 1–3 stacked boxes.
+  // Adjacent columns are fully connected (every box links to every box in the
+  // next column). The last column is styled as the output/sink.
+  columns: z.array(aiWorkflowColumnSchema).min(1).max(4),
+  timings: aiWorkflowDiagramV1TimingsSchema.optional(),
 });
 
+export type AIWorkflowNode = z.infer<typeof aiWorkflowNodeSchema>;
 export type AIWorkflowDiagramV1Props = z.infer<typeof aiWorkflowDiagramV1Schema>;
 
 export const aiWorkflowDiagramV1Meta = {
   description:
-    'Animated AI workflow diagram. A user-query source feeds an intent ' +
-    'router that branches into three parallel agent nodes, all converging ' +
-    'into a final LLM sink. Nodes pop in with overshoot, connectors draw ' +
-    'on, then a continuous data-packet pulse loops through the graph to ' +
-    'show flow. Use for "how our AI pipeline works" explainers, multi-' +
-    'agent routing visuals, or any 1→3→1 fan-out/fan-in workflow story.',
+    'Animated AI workflow diagram with a flexible column layout. 1–4 ' +
+    'columns laid out left → right, each holding 1–3 stacked node boxes. ' +
+    'Adjacent columns are fully connected — every box links to every box ' +
+    'in the next column. Boxes pop in column by column, connectors draw ' +
+    'on, then a data-packet pulse loops through one path across the graph. ' +
+    'Use for AI-pipeline explainers, multi-agent routing, or any staged ' +
+    'fan-out / fan-in workflow story.',
   authoringNotes:
-    'Supply 5 nodes total: source (left), router (next), 3 branches (fan- ' +
-    'out, top→middle→bottom), and sink (right). Labels ≤16 chars; pick ' +
-    'short parallel phrasing for the 3 branches ("Refunds Agent", ' +
-    '"Support Agent", "General Agent" reads better than mixed lengths). ' +
-    'Pick an icon per node from the set: chat, router, shield, card, ' +
-    'message, brain, gear, spark. Default duration 450 frames (15 s).',
+    'columns is an array of 1–4 columns; each column is an array of 1–3 ' +
+    'nodes. Example shapes: [[1],[1],[3],[1]] (classic source→router→3 ' +
+    'agents→sink) or [[3],[2],[3],[1]] for an uneven graph. Labels ≤16 ' +
+    'chars — keep parallel phrasing within a column. Pick an icon per node ' +
+    'from: chat, router, shield, card, message, brain, gear, spark. The ' +
+    'last column is styled as the output/sink. Default duration 450 frames ' +
+    '(15 s); the build phase auto-extends with more columns/boxes and the ' +
+    'pulse loop starts once the graph is fully drawn.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -101,24 +108,32 @@ const NODE_W = 280;
 const NODE_H = 140;
 const NODE_RADIUS = 26;
 
-// Top-left positions for each node. Lays out as:
-//   [source]  →  [router]  ─┬─→ [branch0]  ┐
-//                           ├─→ [branch1]  ┼─→ [sink]
-//                           └─→ [branch2]  ┘
-const POS = {
-  source:  { x: 100,  y: 470 },
-  router:  { x: 540,  y: 470 },
-  branch0: { x: 1020, y: 180 },
-  branch1: { x: 1020, y: 470 },
-  branch2: { x: 1020, y: 760 },
-  sink:    { x: 1540, y: 470 },
-} as const;
-
 type Pos = { x: number; y: number };
-const cx = (p: Pos) => p.x + NODE_W / 2;
-const cy = (p: Pos) => p.y + NODE_H / 2;
 const right = (p: Pos) => ({ x: p.x + NODE_W, y: p.y + NODE_H / 2 });
 const left  = (p: Pos) => ({ x: p.x,           y: p.y + NODE_H / 2 });
+
+// ── Dynamic layout ───────────────────────────────────────────────────────────
+// Columns are spread evenly across the canvas width; boxes within a column are
+// stacked and vertically centred. These constants are tuned so the classic
+// [[1],[1],[3],[1]] shape reproduces the original layout exactly:
+//   1 box  → y 470 (centre)         3 boxes → y 180 / 470 / 760
+//   4 cols → x 120 / 586 / 1053 / 1520 (≈ the old 100 / 540 / 1020 / 1540)
+const MARGIN_X = 120;
+const V_GAP    = 150;
+
+// Left-x of column i in an n-column layout.
+function columnX(i: number, n: number): number {
+  if (n <= 1) return (W - NODE_W) / 2;
+  const step = (W - 2 * MARGIN_X - NODE_W) / (n - 1);
+  return MARGIN_X + i * step;
+}
+
+// Top-y of box j in a column of m boxes (stack vertically centred on canvas).
+function boxY(j: number, m: number): number {
+  const stackH = m * NODE_H + (m - 1) * V_GAP;
+  const top = (H - stackH) / 2;
+  return top + j * (NODE_H + V_GAP);
+}
 
 // Connector definitions — cubic-bezier (P0,P1,P2,P3). Straight horizontals
 // degenerate by placing control points on the same y as the endpoints.
@@ -133,16 +148,6 @@ function makeHCurve(a: Pos, b: Pos): Bezier {
     p3: b,
   };
 }
-
-const CONNECTORS = {
-  src2router:   makeHCurve(right(POS.source),  left(POS.router)),
-  router2b0:    makeHCurve(right(POS.router),  left(POS.branch0)),
-  router2b1:    makeHCurve(right(POS.router),  left(POS.branch1)),
-  router2b2:    makeHCurve(right(POS.router),  left(POS.branch2)),
-  b0_2sink:     makeHCurve(right(POS.branch0), left(POS.sink)),
-  b1_2sink:     makeHCurve(right(POS.branch1), left(POS.sink)),
-  b2_2sink:     makeHCurve(right(POS.branch2), left(POS.sink)),
-} as const;
 
 // ─── Animation timings ───────────────────────────────────────────────────────
 
@@ -486,7 +491,7 @@ function DotGrid({ opacity }: { opacity: number }) {
 // ─── Main scene ──────────────────────────────────────────────────────────────
 
 export const AIWorkflowDiagramV1: React.FC<AIWorkflowDiagramV1Props> = ({
-  source, router, branches, sink, timings,
+  columns, timings,
 }) => {
   const frame = useCurrentFrame();
 
@@ -498,29 +503,57 @@ export const AIWorkflowDiagramV1: React.FC<AIWorkflowDiagramV1Props> = ({
   }, [handle]);
 
   const t = { ...DEFAULT_TIMINGS, ...timings };
-  const BG_DUR       = f(t.bgScaleDuration);
-  const SOURCE_START = f(t.sourceStart);
-  const POP_DUR      = f(t.nodePopDuration);
-  const CONN_DUR     = f(t.connectorDraw);
-  const STAGGER      = f(t.branchStagger);
-  const PULSE_PERIOD = f(t.pulsePeriod);
-  const PULSE_START  = f(t.pulseLoopStart);
+  const BG_DUR        = f(t.bgScaleDuration);
+  const FIRST_START   = f(t.sourceStart);
+  const POP_DUR       = f(t.nodePopDuration);
+  const CONN_DUR      = f(t.connectorDraw);
+  const STAGGER       = f(t.branchStagger);
+  const PULSE_PERIOD  = f(t.pulsePeriod);
+  const PULSE_FLOOR   = f(t.pulseLoopStart);
 
-  // Build the staged timeline (frames).
-  const T = {
-    bgEnd:           BG_DUR,
-    sourceStart:     SOURCE_START,
-    sourceEnd:       SOURCE_START + POP_DUR,
-    conn0Start:      SOURCE_START + POP_DUR,
-    conn0End:        SOURCE_START + POP_DUR + CONN_DUR,
-    routerStart:     SOURCE_START + POP_DUR + CONN_DUR,
-    routerEnd:       SOURCE_START + POP_DUR + CONN_DUR + POP_DUR,
-    branchConnStart: SOURCE_START + POP_DUR + CONN_DUR + POP_DUR,
-    branchStart:     SOURCE_START + POP_DUR + CONN_DUR + POP_DUR + STAGGER,
-    convConnStart:   SOURCE_START + POP_DUR + CONN_DUR + POP_DUR + 2 * STAGGER + CONN_DUR + POP_DUR,
-    sinkStart:       SOURCE_START + POP_DUR + CONN_DUR + POP_DUR + 2 * STAGGER + CONN_DUR + POP_DUR + 2 * STAGGER + CONN_DUR,
-  };
-  T.sinkStart = T.convConnStart + 2 * STAGGER + CONN_DUR;
+  const nCols = columns.length;
+  const lastCol = nCols - 1;
+
+  // ── Geometry: top-left of every box, indexed [col][row] ────────────────────
+  const layout: Pos[][] = columns.map((col, c) =>
+    col.map((_, r) => ({ x: columnX(c, nCols), y: boxY(r, col.length) })),
+  );
+
+  // ── Connectors: complete bipartite between adjacent columns ────────────────
+  type Conn = { c: number; r: number; r2: number; bezier: Bezier };
+  const conns: Conn[] = [];
+  for (let c = 0; c < nCols - 1; c++) {
+    for (let r = 0; r < columns[c]!.length; r++) {
+      for (let r2 = 0; r2 < columns[c + 1]!.length; r2++) {
+        conns.push({
+          c, r, r2,
+          bezier: makeHCurve(right(layout[c]![r]!), left(layout[c + 1]![r2]!)),
+        });
+      }
+    }
+  }
+  const connFor = (c: number, r: number, r2: number) =>
+    conns.find((x) => x.c === c && x.r === r && x.r2 === r2);
+
+  // ── Staged timeline (frames), built column by column ───────────────────────
+  // colStart[c] : first box of column c begins popping (boxes stagger after).
+  // connStart[c]: connectors from column c → c+1 begin drawing.
+  const colStart: number[] = [];
+  const connStart: number[] = [];
+  let cursor = FIRST_START;
+  for (let c = 0; c < nCols; c++) {
+    colStart[c] = cursor;
+    const colPopEnd = cursor + (columns[c]!.length - 1) * STAGGER + POP_DUR;
+    if (c < nCols - 1) {
+      connStart[c] = colPopEnd;
+      cursor = colPopEnd + CONN_DUR;     // next column waits for connectors
+    } else {
+      cursor = colPopEnd;
+    }
+  }
+  const buildEnd = cursor;
+  // Pulse never starts before the graph is fully drawn.
+  const PULSE_START = Math.max(PULSE_FLOOR, buildEnd);
 
   // Helpers
   const popAt = (start: number, isBig = false) => {
@@ -543,70 +576,61 @@ export const AIWorkflowDiagramV1: React.FC<AIWorkflowDiagramV1Props> = ({
     extrapolateRight: 'clamp',
     easing: easeInOutCubic,
   });
-  // Dot grid + diagram fade tied to bg-scale completion so nothing flashes
-  // through during the iris-in.
   const bgOp = clamp01((bgScale - 0.5) * 2);
 
-  // Pop progresses
-  const popSource = popAt(T.sourceStart);
-  const popRouter = popAt(T.routerStart);
-  const popBranch0 = popAt(T.branchStart + 0 * STAGGER);
-  const popBranch1 = popAt(T.branchStart + 1 * STAGGER);
-  const popBranch2 = popAt(T.branchStart + 2 * STAGGER);
-  const popSink   = popAt(T.sinkStart, true);
+  // Per-box pop progress (last column gets the bigger sink overshoot).
+  const popProg: number[][] = columns.map((col, c) =>
+    col.map((_, r) => popAt(colStart[c] + r * STAGGER, c === lastCol)),
+  );
 
-  // Connector draws
-  const drSrc2Router = drawAt(T.conn0Start);
-  const drRouter2B0  = drawAt(T.branchConnStart + 0 * STAGGER);
-  const drRouter2B1  = drawAt(T.branchConnStart + 1 * STAGGER);
-  const drRouter2B2  = drawAt(T.branchConnStart + 2 * STAGGER);
-  const drB02Sink    = drawAt(T.convConnStart + 0 * STAGGER);
-  const drB12Sink    = drawAt(T.convConnStart + 1 * STAGGER);
-  const drB22Sink    = drawAt(T.convConnStart + 2 * STAGGER);
+  // Per-connector draw progress.
+  const connDraw = conns.map((cn) => drawAt(connStart[cn.c]!));
 
   // ── Data-packet pulse loop ────────────────────────────────────────────────
-  // Each pulse travels source→router→⟨branch i⟩→sink in PULSE_PERIOD frames.
-  // We split that into 3 equal legs (source→router 25%, router→branch 35%,
-  // branch→sink 40%). Branch index cycles 0,1,2,0,1,2,…
-  type Leg = { conn: Bezier; t0: number; t1: number };
-
-  const branchPositions = [POS.branch0, POS.branch1, POS.branch2];
-  const branchConns = [CONNECTORS.router2b0, CONNECTORS.router2b1, CONNECTORS.router2b2];
-  const convConns  = [CONNECTORS.b0_2sink,  CONNECTORS.b1_2sink,  CONNECTORS.b2_2sink];
-
+  // The packet travels one box per column along a chosen path, one connector
+  // per "leg" (nCols-1 legs total) per PULSE_PERIOD. The chosen box in column
+  // c rotates as (cycle + c) % colLength, so different routes light up over
+  // time. Needs ≥2 columns; a single column has nothing to traverse.
   let packetPos: Pos | null = null;
   let packetOp = 0;
-  const branchHit = [0, 0, 0]; // pulse per branch
-  let sinkHit = 0;
+  const nodeHit: number[][] = columns.map((col) => col.map(() => 0));
 
-  if (frame >= PULSE_START) {
-    const sincePulseStart = frame - PULSE_START;
-    const cycleIndex = Math.floor(sincePulseStart / PULSE_PERIOD);
-    const localT = (sincePulseStart % PULSE_PERIOD) / PULSE_PERIOD; // 0–1
-    const branchIdx = cycleIndex % 3;
+  if (nCols >= 2 && frame >= PULSE_START) {
+    const since = frame - PULSE_START;
+    const cycle = Math.floor(since / PULSE_PERIOD);
+    const localT = (since % PULSE_PERIOD) / PULSE_PERIOD; // 0–1
 
-    // 3 legs with weighted durations summing to 1
-    const W0 = 0.25, W1 = 0.35, W2 = 0.40;
-    const fadeInEnd  = 0.05;
-    const fadeOutStart = 0.95;
+    // Path: which box to pass through in each column this cycle.
+    const path = columns.map((col, c) => (cycle + c) % col.length);
 
+    const legs = nCols - 1;
+    const legLen = 1 / legs;
+    const fadeInEnd = 0.04;
+    const fadeOutStart = 0.96;
     packetOp = easeOutCubic(clamp01(localT / fadeInEnd))
              * (1 - easeOutCubic(clamp01((localT - fadeOutStart) / (1 - fadeOutStart))));
 
-    if (localT < W0) {
-      const lt = localT / W0;
-      packetPos = bezierAt(CONNECTORS.src2router, easeInOutCubic(lt));
-    } else if (localT < W0 + W1) {
-      const lt = (localT - W0) / W1;
-      packetPos = bezierAt(branchConns[branchIdx]!, easeInOutCubic(lt));
-    } else {
-      const lt = (localT - W0 - W1) / W2;
-      packetPos = bezierAt(convConns[branchIdx]!, easeInOutCubic(lt));
-      // Branch pulse fires at packet's exit from branch (start of leg 3)
-      branchHit[branchIdx] = Math.sin(Math.PI * clamp01(lt * 1.5));
-      // Sink pulse fires as packet lands
-      sinkHit = Math.sin(Math.PI * clamp01((lt - 0.6) / 0.4));
+    const legIdx = Math.min(legs - 1, Math.floor(localT / legLen));
+    const legT = clamp01((localT - legIdx * legLen) / legLen);
+
+    const fromR = path[legIdx]!;
+    const toR   = path[legIdx + 1]!;
+    const cn = connFor(legIdx, fromR, toR);
+    if (cn) packetPos = bezierAt(cn.bezier, easeInOutCubic(legT));
+
+    // Pulse the source box at the very start of its journey.
+    if (legIdx === 0) {
+      nodeHit[0]![path[0]!] = Math.max(
+        nodeHit[0]![path[0]!]!,
+        Math.sin(Math.PI * clamp01(1 - legT * 2)),
+      );
     }
+    // Pulse the destination box as the packet arrives (back half of the leg).
+    const arriveCol = legIdx + 1;
+    nodeHit[arriveCol]![toR] = Math.max(
+      nodeHit[arriveCol]![toR]!,
+      Math.sin(Math.PI * clamp01((legT - 0.5) / 0.5)),
+    );
   }
 
   return (
@@ -632,46 +656,27 @@ export const AIWorkflowDiagramV1: React.FC<AIWorkflowDiagramV1Props> = ({
         <DotGrid opacity={bgOp} />
 
         {/* Connectors (drawn beneath nodes) */}
-        <Connector bezier={CONNECTORS.src2router} drawProgress={drSrc2Router} />
-        <Connector bezier={CONNECTORS.router2b0} drawProgress={drRouter2B0} />
-        <Connector bezier={CONNECTORS.router2b1} drawProgress={drRouter2B1} />
-        <Connector bezier={CONNECTORS.router2b2} drawProgress={drRouter2B2} />
-        <Connector bezier={CONNECTORS.b0_2sink} drawProgress={drB02Sink} />
-        <Connector bezier={CONNECTORS.b1_2sink} drawProgress={drB12Sink} />
-        <Connector bezier={CONNECTORS.b2_2sink} drawProgress={drB22Sink} />
+        {conns.map((cn, i) => (
+          <Connector key={`c${cn.c}-${cn.r}-${cn.r2}`} bezier={cn.bezier} drawProgress={connDraw[i]!} />
+        ))}
 
         {/* Data packet (above connectors, below nodes) */}
         {packetPos && <Packet pos={packetPos} opacity={packetOp} />}
       </svg>
 
       {/* Nodes (HTML for crisp text + drop shadows) */}
-      <Node pos={POS.source}  label={source.label}     icon={source.icon}     popProgress={popSource}  pulse={0} />
-      <Node pos={POS.router}  label={router.label}     icon={router.icon}     popProgress={popRouter}  pulse={0} />
-      <Node pos={POS.branch0} label={branches[0]!.label} icon={branches[0]!.icon} popProgress={popBranch0} pulse={branchHit[0]!} />
-      <Node pos={POS.branch1} label={branches[1]!.label} icon={branches[1]!.icon} popProgress={popBranch1} pulse={branchHit[1]!} />
-      <Node pos={POS.branch2} label={branches[2]!.label} icon={branches[2]!.icon} popProgress={popBranch2} pulse={branchHit[2]!} />
-      <Node pos={POS.sink}    label={sink.label}       icon={sink.icon}       popProgress={popSink}    pulse={sinkHit} isSink />
-
-      {/* Small "centre / orchestration" cue under the router during pulses */}
-      {frame >= PULSE_START && (
-        <div
-          style={{
-            position: 'absolute',
-            left:  cx(POS.router) - 100,
-            top:   POS.router.y + NODE_H + 14,
-            width: 200,
-            textAlign: 'center',
-            fontFamily: "'Satoshi', system-ui, sans-serif",
-            fontWeight: 700,
-            fontSize: 16,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: SUBLABEL_COLOR,
-            pointerEvents: 'none',
-          }}
-        >
-          Route by intent
-        </div>
+      {columns.map((col, c) =>
+        col.map((node, r) => (
+          <Node
+            key={`n${c}-${r}`}
+            pos={layout[c]![r]!}
+            label={node.label}
+            icon={node.icon}
+            popProgress={popProg[c]![r]!}
+            pulse={nodeHit[c]![r]!}
+            isSink={c === lastCol}
+          />
+        )),
       )}
     </AbsoluteFill>
   );
@@ -679,13 +684,17 @@ export const AIWorkflowDiagramV1: React.FC<AIWorkflowDiagramV1Props> = ({
 
 // ─── Demo / test props ───────────────────────────────────────────────────────
 
+// Default = the classic source → router → 3 agents → sink shape, expressed
+// in the new column model ([[1],[1],[3],[1]]). Reproduces the original layout.
 export const aiWorkflowDiagramV1DefaultProps: AIWorkflowDiagramV1Props = {
-  source:  { label: 'User Query',     icon: 'chat'    },
-  router:  { label: 'Intent Router',  icon: 'router'  },
-  branches: [
-    { label: 'Refunds Agent',  icon: 'card'    },
-    { label: 'Support Agent',  icon: 'shield'  },
-    { label: 'General Agent',  icon: 'message' },
+  columns: [
+    [{ label: 'User Query',    icon: 'chat'   }],
+    [{ label: 'Intent Router', icon: 'router' }],
+    [
+      { label: 'Refunds Agent', icon: 'card'    },
+      { label: 'Support Agent', icon: 'shield'  },
+      { label: 'General Agent', icon: 'message' },
+    ],
+    [{ label: 'LLM Engine',    icon: 'brain'  }],
   ],
-  sink:    { label: 'LLM Engine',     icon: 'brain'   },
 };
