@@ -102,7 +102,10 @@ const SPHERE_TOP  = 913;
 const SPHERE_W    = 84;
 const SPHERE_H    = 81;
 
-const TITLE_TOP = 296;
+// Width capped below the 569 px card body so long titles wrap onto a second
+// line instead of bleeding out over the platinum background.
+const TITLE_TOP   = 296;
+const TITLE_WIDTH = 500;
 
 const SUBTOPIC_LEFT  = 232;
 const SUBTOPIC_WIDTH = 380;
@@ -295,12 +298,15 @@ function Card({
           left: CARD_SRC_CX,
           top:  TITLE_TOP,
           transform: 'translateX(-50%)',
+          width: TITLE_WIDTH,
+          textAlign: 'center',
           color: '#FFFFFF',
           fontFamily: "'Inter', system-ui, sans-serif",
           fontWeight: 800,
           fontSize: 55,
+          lineHeight: 1.05,
           letterSpacing: '-0.01em',
-          whiteSpace: 'nowrap',
+          overflowWrap: 'break-word',
           opacity: contentOp,
         }}
       >
@@ -356,8 +362,9 @@ function Card({
           fontFamily: "'Satoshi', system-ui, sans-serif",
           fontWeight: 500,
           fontSize: 33,
+          lineHeight: 1.15,
           letterSpacing: '-0.005em',
-          whiteSpace: 'nowrap',
+          overflowWrap: 'break-word',
           opacity: localFrame >= typeStart ? 1 : 0,
         }}
       >
