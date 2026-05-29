@@ -45,7 +45,9 @@ export const bulletList6PillsTimingsSchema = z
   .partial();
 
 export const bulletList6PillsSchema = z.object({
-  bullets: z.array(bulletList6PillsBulletSchema).length(6),
+  // 1 to 6 bullets. Fewer than 6 still reads as a centred stack — the whole
+  // group is vertically centred on the canvas, not anchored to the top.
+  bullets: z.array(bulletList6PillsBulletSchema).min(1).max(6),
   timings: bulletList6PillsTimingsSchema.optional(),
 });
 
@@ -59,7 +61,9 @@ export const bulletList6PillsMeta = {
     'for content that should read as "here are the N things, said one at a ' +
     'time" — agendas, key takeaways, talking points, syllabus rows.',
   authoringNotes:
-    'Always supply exactly 6 bullets. Labels ≤40 chars each (one line of ' +
+    'Supply 1 to 6 bullets — the stack is vertically centred on the canvas ' +
+    'whatever the count, so 3 bullets sit centred rather than top-anchored. ' +
+    'Labels ≤40 chars each (one line of ' +
     'Satoshi Bold 60 px in a 1600-px-wide pill). Aim for short, parallel ' +
     'phrasing — these read as a list, so consistent grammar across rows ' +
     'matters. GOOD: "Define the brief", "Sketch the structure". BAD: ' +
@@ -85,8 +89,11 @@ const PILL_H    = 140;
 const PILL_RADIUS = 28;
 const PILL_GAP    = 28;
 const PILL_PITCH  = PILL_H + PILL_GAP;
-const FIRST_PILL_TOP =
-  (CANVAS_H - (6 * PILL_H + 5 * PILL_GAP)) / 2;        // = 50
+
+// Top edge of the first pill so the whole stack is vertically centred on the
+// canvas, for any count of pills (1–6). 6 pills → 50; 3 pills → 326; etc.
+const firstPillTopFor = (count: number) =>
+  (CANVAS_H - (count * PILL_H + (count - 1) * PILL_GAP)) / 2;
 
 // Chevron block — rounded square sitting inside the pill on the left.
 const CHEVRON_SIZE   = 120;
@@ -181,18 +188,20 @@ function ChevronGlyph({ size }: { size: number }) {
 
 function Pill({
   rowIndex,
+  firstPillTop,
   scale,
   opacity,
   typedText,
   showCursor,
 }: {
   rowIndex: number;
+  firstPillTop: number; // top edge of row 0 (depends on pill count)
   scale:   number;      // 0 → 1 scale-up at the pill's own centre
   opacity: number;      // 0 → 1 fade-in alongside scale
   typedText: string;    // substring currently revealed
   showCursor: boolean;
 }) {
-  const top = FIRST_PILL_TOP + rowIndex * PILL_PITCH;
+  const top = firstPillTop + rowIndex * PILL_PITCH;
 
   return (
     <div
@@ -299,6 +308,9 @@ export const BulletList6Pills: React.FC<BulletList6PillsProps> = ({
   // Blink cadence: 2 Hz toggle (cursor on/off every 15 frames at 30 fps).
   const cursorVisible = Math.floor(frame / 15) % 2 === 0;
 
+  // Centre the stack vertically for however many pills were supplied.
+  const firstPillTop = firstPillTopFor(bullets.length);
+
   return (
     <AbsoluteFill style={{ background: BG_COLOR, overflow: 'hidden' }}>
       {bullets.map((bullet, i) => {
@@ -344,6 +356,7 @@ export const BulletList6Pills: React.FC<BulletList6PillsProps> = ({
           <Pill
             key={i}
             rowIndex={i}
+            firstPillTop={firstPillTop}
             scale={scale}
             opacity={opacity}
             typedText={typedText}
