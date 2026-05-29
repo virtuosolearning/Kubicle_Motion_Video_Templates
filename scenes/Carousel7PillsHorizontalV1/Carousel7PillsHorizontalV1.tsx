@@ -46,7 +46,10 @@ export const carousel7PillsHorizontalV1TimingsSchema = z
   .partial();
 
 export const carousel7PillsHorizontalV1Schema = z.object({
-  pills:   z.array(carousel7PillsHorizontalV1PillSchema).length(7),
+  // 1 to 7 pills. The camera pan / dwell math sizes itself to the pill count
+  // (computeCameraIndex uses pills.length), so fewer pills just makes a shorter
+  // conveyor — a single pill simply dwells with no pans.
+  pills:   z.array(carousel7PillsHorizontalV1PillSchema).min(1).max(7),
   timings: carousel7PillsHorizontalV1TimingsSchema.optional(),
 });
 
@@ -62,8 +65,11 @@ export const carousel7PillsHorizontalV1Meta = {
     'Platinum-blue panels frame the intro (exits left) and outro (enters right). ' +
     'Use for multi-step workflows, video module breakdowns, or roadmap timelines.',
   authoringNotes:
-    'Always supply exactly 7 pills. Labels ≤22 chars each (one line of Satoshi ' +
-    'Bold ~64 px). Use parallel phrasing — short noun phrases or step titles. ' +
+    'Supply 1 to 7 pills — the conveyor sizes to the count, so fewer pills just ' +
+    'makes a shorter sweep (a single pill dwells with no pans). Labels ≤22 chars ' +
+    'each (one line of Satoshi Bold ~64 px) — keep them short or summarise, as ' +
+    'the label is clipped to the pill and will not spill past the end-cap. Use ' +
+    'parallel phrasing — short noun phrases or step titles. ' +
     'Default duration 450 frames (15 s @ 30 fps); the camera dwells ~0.65 s on ' +
     'each pill and pans ~1.20 s between them. No icons inside the pills — each ' +
     'pill is preceded by a circular play-button signifier.',
@@ -300,8 +306,18 @@ function Stage({
           fontWeight: 700,
           fontSize: 68,
           letterSpacing: '-0.01em',
-          lineHeight: 1,
+          // lineHeight > 1 so the clip box has room for descenders (g, y, p) —
+          // overflow:hidden (below) clips vertically too, and lineHeight:1 would
+          // shave the bottoms off. The pill centres the text, so it stays centred.
+          lineHeight: 1.25,
           whiteSpace: 'nowrap',
+          // Stay inside the pill: take the remaining flex space and clip with an
+          // ellipsis rather than spilling past the rounded end-cap. The ≤22-char
+          // schema cap keeps real labels well within this; this is the safety net.
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
           opacity: textOpacity,
         }}
       >
