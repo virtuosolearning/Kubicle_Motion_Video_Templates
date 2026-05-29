@@ -47,7 +47,10 @@ export const carousel5TilesTimingsSchema = z
   .partial();
 
 export const carousel5TilesSchema = z.object({
-  tiles:   z.array(carousel5TilesTileSchema).length(5),
+  // 2 to 5 tiles. The coverflow ring sizes itself to the tile count (slotFor /
+  // computeCarouselIndex both use tiles.length), so fewer tiles just makes a
+  // shorter ring — the centred tile and its neighbours render the same way.
+  tiles:   z.array(carousel5TilesTileSchema).min(2).max(5),
   timings: carousel5TilesTimingsSchema.optional(),
 });
 
@@ -59,7 +62,8 @@ export const carousel5TilesMeta = {
     'a black canvas, each showing an icon + dodger-blue title + 2-3 white ' +
     'bullets in Satoshi Medium. Best for cycling related concepts.',
   authoringNotes:
-    'Always supply exactly 5 tiles. Titles ≤28 chars, bullets ≤34 chars each ' +
+    'Supply 2 to 5 tiles — the coverflow ring sizes to the count, so fewer ' +
+    'tiles simply makes a shorter cycle. Titles ≤28 chars, bullets ≤34 chars each ' +
     '(2-3 bullets per tile). Use parallel imperative phrasing across tiles. ' +
     'Pick an icon id matching the catalog (terminal, sparkles, zap, layers, ' +
     'shield-check) or drop a new patched SVG into icons/. Default duration ' +
@@ -125,10 +129,19 @@ function loadFonts(): Promise<void> {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// Signed shortest-path slot in a ring of size n.
+// Signed slot for a tile relative to the centred carousel index.
+//
+// For 3+ tiles we wrap around the ring (shortest path) so tiles can re-enter
+// from the opposite side — the coverflow loop. For exactly 2 tiles that ring is
+// degenerate: the "other" tile sits at the antipode (distance n/2 = 1), and the
+// wrap flips the exiting tile from slot −1 to +1 mid-transition, teleporting it
+// across the screen (the cull at 1.4 can't hide it because the flip is at 1.0).
+// So with 2 tiles we use the raw linear distance: the exiting tile simply slides
+// off one side and stays off — no reappearing ghost.
 function slotFor(tileIdx: number, carouselIdx: number, n: number): number {
-  let d = tileIdx - carouselIdx;
-  d = ((d % n) + n) % n;
+  const raw = tileIdx - carouselIdx;
+  if (n < 3) return raw;
+  let d = ((raw % n) + n) % n;
   if (d > n / 2) d -= n;
   return d;
 }
