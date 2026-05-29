@@ -31,12 +31,11 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const characterSchema = z.object({
-  id:              z.string().min(1),
-  // Rendered px height of the character image inside its card body.
-  characterHeight: z.number().min(150).max(900).optional(),
-  // Top offset (px) of the image inside the character container.
-  // Tune so the face lands at the container's vertical centre (~265 px).
-  characterY:      z.number().optional(),
+  // Only the character identity is authorable. Every card renders the portrait
+  // at the SAME fixed size and vertical offset (CHARACTER_HEIGHT / CHARACTER_Y)
+  // so the tops of all three heads line up across the trio. Swap the id to
+  // change the person — never the framing.
+  id: z.string().min(1),
 });
 
 const cardSchema = z.object({
@@ -76,10 +75,14 @@ export const bigPoints3V2CharacterMeta = {
   authoringNotes:
     'Always supply exactly 3 cards. title ≤25 chars (Inter ExtraBold 55 px). ' +
     'subtopic ≤30 chars (Satoshi Medium 33 px, typewriter). character.id ' +
-    'is a PNG ID in characters/<id>.png. characterHeight + characterY tune ' +
-    'the face position inside the card; defaults work for typical ' +
-    'presenter-framed PNGs (face ~27% from PNG top). Use a different ' +
-    'character per card for the team feel. Default duration 300 frames.',
+    'is a PNG ID in characters/<id>.png — the ONLY authorable field. Size ' +
+    'and position are fixed for every card so the tops of all three heads ' +
+    'line up; you cannot (and should not) resize or reposition a character. ' +
+    'Just swap the id to change the person. IMPORTANT: use consistently-framed ' +
+    'presenter HEAD-SHOTS (roughly square, face ~27% from the top). Full-body ' +
+    'shots or wide/landscape images will NOT align — heads end up different ' +
+    'sizes and positions. Use a different character per card for the team ' +
+    'feel. Default duration 300 frames.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -123,15 +126,16 @@ const CHAR_CONTAINER_WIDTH  = 569;
 const CHAR_CONTAINER_HEIGHT = 801;
 const CHAR_CONTAINER_RADIUS = 40;
 
-// Defaults — characterHeight sized so the image bottom extends BELOW
-// the container bottom (image bottom = characterY + characterHeight =
-// 910 > container height 801), meaning the figure clips at the card
-// bottom (rounded edge) rather than at a visible straight line above
-// the pill. No torso cut-off visible in the dodger-blue gap below the
-// chest — the body fills all the way down to the rounded card edge,
-// with the pill graphic overlapping the middle of the torso.
-const DEFAULT_CHARACTER_HEIGHT = 780;
-const DEFAULT_CHARACTER_Y      = 130;   // face lands ~y=567 in card source
+// Fixed for EVERY character — not authorable. Height/Y are identical for all
+// three cards so the heads line up across the trio. This ONLY holds for
+// consistently-framed presenter head-shots (face ~27% from the PNG top, roughly
+// square canvas) — the intended input for this template. Full-body shots or
+// non-portrait images won't match in head size/position; no fixed transform can
+// reconcile different shot types. Height extends below the 801px container so
+// the figure clips at the rounded card edge (image bottom = 130+780 = 910),
+// with the pill graphic overlapping the mid-torso.
+const CHARACTER_HEIGHT = 780;
+const CHARACTER_Y      = 130;   // face lands ~y=567 in card source
 
 // ─── Animation timings ────────────────────────────────────────────────────────
 
@@ -235,9 +239,6 @@ function Card({
   const offsetX = CARD_FINAL_CXS[index]! - CARD_SRC_CX;
   const offsetY = CARD_OFFSET_Y;
 
-  const characterHeight = card.character.characterHeight ?? DEFAULT_CHARACTER_HEIGHT;
-  const characterY      = card.character.characterY      ?? DEFAULT_CHARACTER_Y;
-
   return (
     <div
       style={{
@@ -279,8 +280,8 @@ function Card({
           style={{
             position: 'absolute',
             left: '50%',
-            top:  characterY,
-            height: characterHeight,
+            top:  CHARACTER_Y,
+            height: CHARACTER_HEIGHT,
             width:  'auto',
             transform: 'translateX(-50%)',
             display: 'block',
@@ -422,22 +423,14 @@ export const BigPoints3V2Character: React.FC<BigPoints3V2CharacterProps> = ({ ca
 
 // ─── Demo / test props ────────────────────────────────────────────────────────
 
+// character.id values are PNG filenames (sans extension) from the character
+// library. Any consistently-framed presenter head-shot works — i.e. every
+// library character EXCEPT the non-portrait outliers (daniel = full-body,
+// lena = landscape scene), which won't align under the fixed framing.
 export const bigPoints3V2CharacterDefaultProps: BigPoints3V2CharacterProps = {
   cards: [
-    {
-      title:    'Plan',
-      subtopic: 'Map the project scope',
-      character: { id: 'amelia', characterHeight: 780, characterY: 130 },
-    },
-    {
-      title:    'Build',
-      subtopic: 'Ship a working first cut',
-      character: { id: 'ken',    characterHeight: 780, characterY: 130 },
-    },
-    {
-      title:    'Ship',
-      subtopic: 'Tell the world it exists',
-      character: { id: 'claire', characterHeight: 780, characterY: 130 },
-    },
+    { title: 'Plan',  subtopic: 'Map the project scope',   character: { id: 'male_middleage_white' } },
+    { title: 'Build', subtopic: 'Ship a working first cut', character: { id: 'female_earlycareer_black' } },
+    { title: 'Ship',  subtopic: 'Tell the world it exists', character: { id: 'female_middleage_asian' } },
   ],
 };
