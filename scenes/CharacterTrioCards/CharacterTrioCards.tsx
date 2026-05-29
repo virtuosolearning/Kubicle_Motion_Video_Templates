@@ -34,26 +34,21 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const cardSchema = z.object({
-  // Character PNG id — resolves to characters/<id>.png.
+  // Character PNG id — resolves to characters/<id>.png. Size + position are
+  // FIXED for every card (CHARACTER_HEIGHT / CHARACTER_Y) so all heads match —
+  // no per-card tuning. Use a consistently-framed presenter portrait from the
+  // character library; do NOT use daniel.png or lena.png (framed differently).
   characterId:     z.string().min(1),
-  // Rendered height of the character image inside the portrait, in pixels.
-  // Tune across the trio so head sizes match. Must be ≥ portrait height
-  // (520) AND the implied width (height × PNG aspect) must be ≥ portrait
-  // width (524), otherwise accent colour will show through gaps.
-  characterHeight: z.number().min(200).max(2400),
-  // Top offset of the character image within the portrait, in pixels.
-  // Negative shifts the character UP inside the portrait (cropping more
-  // from the top of the source image). Tune to align hair-tops across
-  // the trio.
-  characterY:      z.number(),
   // Workplace title (NOT a personal name) — bold dark, ≤22 chars to fit.
   title:           z.string().min(1).max(22),
   verified:        z.boolean().optional(),
   bio:             z.string().min(1).max(80),
   followersCount:  z.number().int().nonnegative(),
   postsCount:      z.number().int().nonnegative(),
-  // Accent colour hex (e.g. '#0496FF').
-  accentColor:     z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  // Accent colour — one of the three brand colours only: dodger blue,
+  // wild strawberry, or ocean green. Tints the portrait panel, verified
+  // tick, and Follow button.
+  accentColor:     z.enum(['#0496FF', '#F865B0', '#3AB795']),
 });
 
 export const characterTrioCardsTimingsSchema = z
@@ -92,12 +87,15 @@ export const characterTrioCardsMeta = {
     'a trio of characters by workplace role.',
   authoringNotes:
     'Always supply exactly 3 cards. Per-card: characterId (PNG in ' +
-    'characters/<id>.png), characterHeight (rendered px height of the ' +
-    'image — tune across the trio so head sizes match), characterY ' +
-    '(pixel top offset — negative to crop the image upward; tune to ' +
-    'align hair-tops). title (≤22 chars — workplace role, NOT name). ' +
-    'bio ≤80 chars. accentColor hex. Default duration 450 frames; cards ' +
-    'land sequentially over ~1.8 s, content fills over the next ~1.5 s.',
+    'characters/<id>.png) — use a consistently-framed presenter portrait from ' +
+    'the character library; do NOT use daniel.png or lena.png (different ' +
+    'framing/scale). Character size + position are FIXED for every card so all ' +
+    'heads match — just pick the id, nothing to tune. title (≤22 chars — ' +
+    'workplace role, NOT name). bio ≤80 chars (wraps onto the next line, kept ' +
+    'inside the card). accentColor is one of three brand colours only: #0496FF ' +
+    '(dodger blue), #F865B0 (wild strawberry), or #3AB795 (ocean green) — it ' +
+    'tints the portrait panel, the verified tick, and the Follow button. ' +
+    'Default duration 450 frames; cards land sequentially over ~1.8 s.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -124,6 +122,11 @@ const PORTRAIT_W = CARD_W - 2 * CARD_PAD;      // 524
 const PORTRAIT_H = 520;
 const PORTRAIT_RADIUS = 24;
 
+// Fixed character framing for EVERY card — not authorable — so all heads match.
+// Use consistently-framed library presenter portraits (NOT daniel/lena).
+const CHARACTER_HEIGHT = 760;
+const CHARACTER_Y      = -10;
+
 // Bottom row + Follow button.
 const BOTTOM_ROW_Y = CARD_H - CARD_PAD - 48;
 const BOTTOM_ROW_H = 48;
@@ -131,9 +134,9 @@ const FOLLOW_W = 132;
 const FOLLOW_H = 48;
 const FOLLOW_LEFT = CARD_W - CARD_PAD - FOLLOW_W;
 
-// Vertical positions of title + bio (card-local).
+// Vertical start of the title + bio text column (card-local). The bio flows
+// below the title, so its position follows the title's height automatically.
 const TITLE_Y = CARD_PAD + PORTRAIT_H + 24;
-const BIO_Y   = TITLE_Y + 56;
 
 // ─── Animation timings ───────────────────────────────────────────────────────
 
@@ -177,7 +180,6 @@ const DARK_TEXT  = '#0A0F18';
 const MUTED_TEXT = '#6B7280';
 const ICON_GREY  = '#9CA3AF';
 const VERIFIED_FG = '#FFFFFF';
-const FOLLOW_BORDER = '#E5E7EB';
 
 const CARD_SHADOW =
   '0 24px 50px rgba(15, 25, 45, 0.10), ' +
@@ -380,8 +382,8 @@ function Card({
           style={{
             position: 'absolute',
             left: '50%',
-            top:  card.characterY,
-            height: card.characterHeight,
+            top:  CHARACTER_Y,
+            height: CHARACTER_HEIGHT,
             width: 'auto',
             transform: 'translateX(-50%)',
             // Drop shadow follows the cut-out's alpha so the figure casts
@@ -393,63 +395,77 @@ function Card({
         />
       </div>
 
-      {/* TITLE ROW */}
+      {/* TITLE + BIO — a flowing column. Long text wraps onto the next line and
+          the bio is pushed down (no fixed-position overlap). The card's
+          overflow:hidden is the final guard against spilling onto the canvas. */}
       <div
         style={{
           position: 'absolute',
           left: CARD_PAD,
           top:  TITLE_Y,
+          width: CARD_W - 2 * CARD_PAD,
           display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          transform: `translateY(${titleAnim.translateY}px)`,
-          opacity: titleAnim.opacity,
+          flexDirection: 'column',
+          gap: 18,
         }}
       >
-        <span
+        {/* TITLE ROW */}
+        <div
           style={{
-            color: DARK_TEXT,
-            fontFamily: "'Satoshi', system-ui, sans-serif",
-            fontWeight: 700,
-            fontSize: 32,
-            letterSpacing: '-0.02em',
-            lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10,
+            transform: `translateY(${titleAnim.translateY}px)`,
+            opacity: titleAnim.opacity,
           }}
         >
-          {card.title}
-        </span>
-        {card.verified !== false && (
-          <div
+          <span
             style={{
-              transform: `scale(${badgeScale})`,
-              transformOrigin: '50% 50%',
-              opacity: badgeOpacity,
-              display: 'flex',
+              color: DARK_TEXT,
+              fontFamily: "'Satoshi', system-ui, sans-serif",
+              fontWeight: 700,
+              fontSize: 32,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              overflowWrap: 'break-word',
+              wordBreak: 'break-word',
             }}
           >
-            <VerifiedBadge size={26} fill={card.accentColor} />
-          </div>
-        )}
-      </div>
+            {card.title}
+          </span>
+          {card.verified !== false && (
+            <div
+              style={{
+                transform: `scale(${badgeScale})`,
+                transformOrigin: '50% 50%',
+                opacity: badgeOpacity,
+                display: 'flex',
+              }}
+            >
+              <VerifiedBadge size={26} fill={card.accentColor} />
+            </div>
+          )}
+        </div>
 
-      {/* BIO */}
-      <div
-        style={{
-          position: 'absolute',
-          left: CARD_PAD,
-          top:  BIO_Y,
-          width:  CARD_W - 2 * CARD_PAD,
-          color: MUTED_TEXT,
-          fontFamily: "'Satoshi', system-ui, sans-serif",
-          fontWeight: 500,
-          fontSize: 20,
-          lineHeight: 1.35,
-          letterSpacing: '-0.005em',
-          transform: `translateY(${bioAnim.translateY}px)`,
-          opacity: bioAnim.opacity,
-        }}
-      >
-        {card.bio}
+        {/* BIO */}
+        <div
+          style={{
+            width: '100%',
+            color: MUTED_TEXT,
+            fontFamily: "'Satoshi', system-ui, sans-serif",
+            fontWeight: 500,
+            fontSize: 20,
+            lineHeight: 1.35,
+            letterSpacing: '-0.005em',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-word',
+            transform: `translateY(${bioAnim.translateY}px)`,
+            opacity: bioAnim.opacity,
+          }}
+        >
+          {card.bio}
+        </div>
       </div>
 
       {/* BOTTOM ROW */}
@@ -523,8 +539,9 @@ function Card({
             width:  FOLLOW_W,
             height: FOLLOW_H,
             borderRadius: FOLLOW_H / 2,
-            background: CARD_BG,
-            border: `1px solid ${FOLLOW_BORDER}`,
+            // Filled with the card's accent colour to match the verified tick.
+            background: card.accentColor,
+            border: 'none',
             boxShadow: BUTTON_SHADOW,
             display: 'flex',
             alignItems: 'center',
@@ -537,7 +554,7 @@ function Card({
         >
           <span
             style={{
-              color: DARK_TEXT,
+              color: '#FFFFFF',
               fontFamily: "'Satoshi', system-ui, sans-serif",
               fontWeight: 700,
               fontSize: 19,
@@ -546,7 +563,7 @@ function Card({
           >
             Follow
           </span>
-          <PlusIcon size={18} color={DARK_TEXT} />
+          <PlusIcon size={18} color="#FFFFFF" />
         </div>
       </div>
     </div>
@@ -609,24 +626,11 @@ export const CharacterTrioCards: React.FC<CharacterTrioCardsProps> = ({
 // ─── Demo / test props ───────────────────────────────────────────────────────
 
 export const characterTrioCardsDefaultProps: CharacterTrioCardsProps = {
-  // characterHeight + characterY tuned per-PNG so:
-  //   1. Head sizes match within ±10% across the trio.
-  //   2. Hair-tops land at roughly the same y inside each portrait.
-  //   3. Head + shoulders + chest visible in all three (Lena-style framing).
-  // Heights tuned so each character's HEAD measures ≈ 210 px in the
-  // rendered portrait, matching Lena. Daniel's and Mark's PNGs have
-  // higher head-to-frame ratios (their figures fill more of the PNG)
-  // so they need smaller render heights than Lena to keep heads the
-  // same visual size. The trade-off: their image is now narrower than
-  // the portrait, so a sliver of accent colour shows on each side —
-  // a Pinterest-style "framed portrait" border that reads as deliberate.
+  // Library presenter portraits only (NOT daniel/lena). Size + position are
+  // fixed for every card, so just pick an id — no per-card tuning.
   cards: [
     {
-      characterId:    'daniel',
-      // Head ≈ 26% of Daniel PNG. Height 800 → head ≈ 208 px.
-      // Width = 800 × 2777/4617 ≈ 481 (43 px accent border on each side).
-      characterHeight: 800,
-      characterY:      -12,
+      characterId:    'male_middleage_white',
       title:           'Product Strategist',
       verified:        true,
       bio:             'Helping early-stage teams ship faster and sharper.',
@@ -635,10 +639,7 @@ export const characterTrioCardsDefaultProps: CharacterTrioCardsProps = {
       accentColor:     '#0496FF',   // dodger blue
     },
     {
-      characterId:    'lena',
-      // Head ≈ 33% of Lena PNG. Height 640 → head ≈ 210 px (reference).
-      characterHeight: 640,
-      characterY:      -45,
+      characterId:    'female_earlycareer_black',
       title:           'Head of Design',
       verified:        true,
       bio:             'Building product systems people actually love to use.',
@@ -647,17 +648,13 @@ export const characterTrioCardsDefaultProps: CharacterTrioCardsProps = {
       accentColor:     '#F865B0',   // wild strawberry
     },
     {
-      characterId:    'mark',
-      // Head ≈ 31% of Mark PNG. Height 680 → head ≈ 211 px.
-      // Width = 680 × 2594/3888 ≈ 454 (35 px accent border each side).
-      characterHeight: 680,
-      characterY:      -8,
+      characterId:    'male_middleage_black',
       title:           'Engineering Lead',
       verified:        true,
       bio:             'Shipping reliable, well-tested code without the drama.',
       followersCount:  1567,
       postsCount:      128,
-      accentColor:     '#48BF91',   // ocean green
+      accentColor:     '#3AB795',   // ocean green
     },
   ],
 };

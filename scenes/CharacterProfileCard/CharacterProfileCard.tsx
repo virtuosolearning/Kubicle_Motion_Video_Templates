@@ -72,6 +72,10 @@ export const characterProfileCardSchema = z.object({
   followersCount: z.number().int().nonnegative(),
   // A second stat — posts / projects / something countable. Format same.
   postsCount:     z.number().int().nonnegative(),
+  // Accent colour — one of three brand colours only: dodger blue, wild
+  // strawberry, or ocean green. Tints the portrait backing, the verified
+  // tick, and the Follow button.
+  accentColor:    z.enum(['#0496FF', '#F865B0', '#3AB795']),
   timings:        characterProfileCardTimingsSchema.optional(),
 });
 
@@ -87,13 +91,16 @@ export const characterProfileCardMeta = {
     '(followers + posts), and a Follow pill on the right. Use to introduce ' +
     'a course presenter, panellist, or any single character by their role.',
   authoringNotes:
-    'characterId is a PNG ID in characters/<id>.png — pick a head-to-waist ' +
-    'cut-out portrait. title ≤30 chars — the character\'s workplace role ' +
-    '(e.g. "Product Strategist", "Founder & CEO", "Head of Design"), NOT ' +
-    'their personal name. bio ≤95 chars (wraps to ~2 lines). followersCount ' +
-    '+ postsCount are ints; large values format with commas. Default ' +
-    'duration 450 frames (15 s @ 30 fps); animations complete in the first ' +
-    '~2.7 s and the card then holds for the remainder.',
+    'characterId is a PNG ID in characters/<id>.png — use a consistently-' +
+    'framed library presenter portrait; do NOT use daniel.png or lena.png. The ' +
+    'portrait fills a fixed height, so size is uniform — just pick the id. ' +
+    'title ≤30 chars — the character\'s workplace role (e.g. "Product ' +
+    'Strategist", "Founder & CEO"), NOT their personal name. bio ≤95 chars ' +
+    '(wraps to ~2 lines). followersCount + postsCount are ints; large values ' +
+    'format with commas. accentColor is one of three brand colours only: ' +
+    '#0496FF (dodger blue), #F865B0 (wild strawberry), or #3AB795 (ocean ' +
+    'green) — tints the portrait backing, the verified tick, and the Follow ' +
+    'button. Default duration 450 frames (15 s @ 30 fps).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -167,13 +174,10 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 const CANVAS_BG     = '#EDEFF3';                     // soft cool-grey backdrop
 const CARD_BG       = '#FFFFFF';                     // crisp white card
-const PORTRAIT_BG   = '#0496FF';                     // dodger-blue portrait backing
 const DARK_TEXT     = '#0A0F18';
 const MUTED_TEXT    = '#6B7280';
 const ICON_GREY     = '#9CA3AF';
-const VERIFIED_BG   = '#0496FF';                     // dodger-blue verified tick
 const VERIFIED_FG   = '#FFFFFF';
-const FOLLOW_BORDER = '#E5E7EB';
 
 const CARD_SHADOW =
   '0 30px 60px rgba(15, 25, 45, 0.10), ' +
@@ -209,7 +213,7 @@ function loadFonts(): Promise<void> {
 
 // ─── Inline glyphs ───────────────────────────────────────────────────────────
 
-function VerifiedBadge({ size }: { size: number }) {
+function VerifiedBadge({ size, fill }: { size: number; fill: string }) {
   // Twitter/Instagram-style serrated badge in dodger blue, with a centred
   // white tick. Tick is sized so its visual centre sits at the badge's
   // centre (16, 16 on the 32-unit viewBox).
@@ -217,7 +221,7 @@ function VerifiedBadge({ size }: { size: number }) {
     <svg width={size} height={size} viewBox="0 0 32 32">
       <path
         d="M16 1 L19.2 3.3 L23.2 2.8 L24.5 6.5 L28 8.3 L26.9 12.2 L28.5 16 L26 19.1 L26.5 23 L22.8 24.4 L20.8 27.8 L17 26.7 L13 27.8 L11 24.4 L7.3 23 L7.8 19.1 L5.3 16 L6.9 12.2 L5.8 8.3 L9.3 6.5 L10.6 2.8 L14.6 3.3 Z"
-        fill={VERIFIED_BG}
+        fill={fill}
       />
       {/* Tick — sized at ~9×6 units inside the 32-unit badge so it
           comfortably fits inside the serrated edge. Centroid ≈ (15.5, 16),
@@ -297,6 +301,7 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
   bio,
   followersCount,
   postsCount,
+  accentColor,
   timings,
 }) => {
   const frame = useCurrentFrame();
@@ -398,7 +403,7 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
             width:  PORTRAIT_W,
             height: PORTRAIT_H,
             borderRadius: PORTRAIT_RADIUS,
-            background: PORTRAIT_BG,
+            background: accentColor,
             overflow: 'hidden',
             transform: `scale(${portraitScale})`,
             transformOrigin: '50% 100%',
@@ -460,7 +465,7 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
                 display: 'flex',
               }}
             >
-              <VerifiedBadge size={32} />
+              <VerifiedBadge size={32} fill={accentColor} />
             </div>
           )}
         </div>
@@ -560,8 +565,9 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
               width:  FOLLOW_W,
               height: FOLLOW_H,
               borderRadius: FOLLOW_H / 2,
-              background: CARD_BG,
-              border: `1px solid ${FOLLOW_BORDER}`,
+              // Filled with the accent colour to match the verified tick.
+              background: accentColor,
+              border: 'none',
               boxShadow: BUTTON_SHADOW,
               display: 'flex',
               alignItems: 'center',
@@ -574,7 +580,7 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
           >
             <span
               style={{
-                color: DARK_TEXT,
+                color: '#FFFFFF',
                 fontFamily: "'Satoshi', system-ui, sans-serif",
                 fontWeight: 700,
                 fontSize: 22,
@@ -583,7 +589,7 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
             >
               Follow
             </span>
-            <PlusIcon size={20} color={DARK_TEXT} />
+            <PlusIcon size={20} color="#FFFFFF" />
           </div>
         </div>
       </div>
@@ -594,10 +600,13 @@ export const CharacterProfileCard: React.FC<CharacterProfileCardProps> = ({
 // ─── Demo / test props ───────────────────────────────────────────────────────
 
 export const characterProfileCardDefaultProps: CharacterProfileCardProps = {
-  characterId: 'daniel',
+  // Library presenter portrait (NOT daniel/lena). The portrait fills a fixed
+  // height, so any consistently-framed square portrait reads at the same size.
+  characterId: 'male_middleage_white',
   title: 'Product Strategist',
   verified: true,
   bio: 'Helping early-stage teams ship faster, sharper, and with confidence.',
   followersCount: 1248,
   postsCount: 86,
+  accentColor: '#0496FF',   // dodger blue
 };

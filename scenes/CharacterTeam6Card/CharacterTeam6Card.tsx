@@ -30,11 +30,10 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const slotSchema = z.object({
+  // Character PNG id. Size + position are FIXED for every slot (CHARACTER_HEIGHT
+  // / CHARACTER_Y) so all six heads come out the same size — no per-character
+  // tuning. Use consistently-framed library presenter portraits (NOT daniel/lena).
   characterId:     z.string().min(1),
-  // Rendered height of the character image in px.
-  characterHeight: z.number().min(200).max(1500),
-  // Top offset inside the slot (px). Negative crops the top of the image.
-  characterY:      z.number(),
   // Per-character title (e.g. "Designer", "Engineer", "PM"). Rendered as
   // subtle light-grey text directly below each character's portrait slot.
   // ≤18 chars to fit the 290 px slot.
@@ -67,7 +66,10 @@ export const characterTeam6CardSchema = z.object({
   bio:        z.string().min(1).max(95),
   followersCount: z.number().int().nonnegative(),
   postsCount:     z.number().int().nonnegative(),
-  accentColor:    z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  // Single accent colour — one of three brand colours only: dodger blue,
+  // wild strawberry, or ocean green. Tints the portrait BG, verified tick,
+  // and Follow button.
+  accentColor:    z.enum(['#0496FF', '#F865B0', '#3AB795']),
   timings:        characterTeam6CardTimingsSchema.optional(),
 });
 
@@ -81,10 +83,14 @@ export const characterTeam6CardMeta = {
     'advisory board. The whole team arrives together as the card pops in.',
   authoringNotes:
     'Supply exactly 6 characters. Each is { characterId (PNG in ' +
-    'characters/<id>.png), characterHeight (rendered px), characterY ' +
-    '(top offset in px, often near 0) }. title ≤24 chars (e.g. "Founding ' +
-    'Team"). bio ≤95 chars. accentColor is a single hex applied to the ' +
-    'portrait BG and the verified badge. Default duration 450 frames.',
+    'characters/<id>.png), characterTitle (≤18 chars) }. Use consistently-' +
+    'framed library presenter portraits; do NOT use daniel.png or lena.png. ' +
+    'Character size is FIXED for every slot so all six heads match — just pick ' +
+    'ids. title ≤24 chars (e.g. "Founding Team"). bio ≤95 chars (wraps onto the ' +
+    'next line, kept inside the card). accentColor is one of three brand ' +
+    'colours only: #0496FF (dodger blue), #F865B0 (wild strawberry), or #3AB795 ' +
+    '(ocean green) — tints the portrait BG, the verified tick, and the Follow ' +
+    'button. Default duration 450 frames.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -114,6 +120,11 @@ const PORTRAIT_RADIUS = 24;
 const SLOT_COUNT = 6;
 const SLOT_W     = PORTRAIT_W / SLOT_COUNT;      // 290
 
+// Fixed character framing for EVERY slot — not authorable — so all six heads
+// match. Sized for consistently-framed library presenter portraits (NOT daniel/lena).
+const CHARACTER_HEIGHT = 620;
+const CHARACTER_Y      = 0;
+
 // Per-character title row sits directly below the portrait — subtle,
 // light-grey labels (one per character, centred on each slot).
 const PER_CHAR_TITLE_Y = CARD_PAD + PORTRAIT_H + 14;  // 644
@@ -121,7 +132,7 @@ const PER_CHAR_TITLE_H = 28;
 
 // Main title + bio shifted down to make room for the per-character labels.
 const TITLE_Y      = PER_CHAR_TITLE_Y + PER_CHAR_TITLE_H + 22;  // 694
-const BIO_Y        = TITLE_Y + 56;                              // 750
+// (bio flows below the title in a column, so no fixed BIO_Y is needed)
 const BOTTOM_ROW_Y = CARD_H - CARD_PAD - 48;                    // 842
 const BOTTOM_ROW_H = 48;
 
@@ -168,7 +179,6 @@ const DARK_TEXT  = '#0A0F18';
 const MUTED_TEXT = '#6B7280';
 const ICON_GREY  = '#9CA3AF';
 const VERIFIED_FG = '#FFFFFF';
-const FOLLOW_BORDER = '#E5E7EB';
 
 const CARD_SHADOW =
   '0 30px 60px rgba(15, 25, 45, 0.12), ' +
@@ -306,8 +316,8 @@ function CharacterSlot({
         style={{
           position: 'absolute',
           left: '50%',
-          top:  slot.characterY,
-          height: slot.characterHeight,
+          top:  CHARACTER_Y,
+          height: CHARACTER_HEIGHT,
           width: 'auto',
           transform: 'translateX(-50%)',
           filter:
@@ -455,63 +465,77 @@ export const CharacterTeam6Card: React.FC<CharacterTeam6CardProps> = ({
           ))}
         </div>
 
-        {/* TITLE ROW */}
+        {/* TITLE + BIO — flowing column. Long text wraps onto the next line and
+            the bio is pushed down (no fixed-position overlap); the card's
+            overflow:hidden keeps everything off the canvas background. */}
         <div
           style={{
             position: 'absolute',
             left: CARD_PAD,
             top:  TITLE_Y,
+            width: CARD_W - 2 * CARD_PAD,
             display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            transform: `translateY(${titleAnim.translateY}px)`,
-            opacity: titleAnim.opacity,
+            flexDirection: 'column',
+            gap: 16,
           }}
         >
-          <span
+          {/* TITLE ROW */}
+          <div
             style={{
-              color: DARK_TEXT,
-              fontFamily: "'Satoshi', system-ui, sans-serif",
-              fontWeight: 700,
-              fontSize: 40,
-              letterSpacing: '-0.02em',
-              lineHeight: 1,
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12,
+              transform: `translateY(${titleAnim.translateY}px)`,
+              opacity: titleAnim.opacity,
             }}
           >
-            {title}
-          </span>
-          {verified && (
-            <div
+            <span
               style={{
-                transform: `scale(${badgeScale})`,
-                transformOrigin: '50% 50%',
-                opacity: badgeOpacity,
-                display: 'flex',
+                color: DARK_TEXT,
+                fontFamily: "'Satoshi', system-ui, sans-serif",
+                fontWeight: 700,
+                fontSize: 40,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.1,
+                overflowWrap: 'break-word',
+                wordBreak: 'break-word',
               }}
             >
-              <VerifiedBadge size={30} fill={accentColor} />
-            </div>
-          )}
-        </div>
+              {title}
+            </span>
+            {verified && (
+              <div
+                style={{
+                  transform: `scale(${badgeScale})`,
+                  transformOrigin: '50% 50%',
+                  opacity: badgeOpacity,
+                  display: 'flex',
+                }}
+              >
+                <VerifiedBadge size={30} fill={accentColor} />
+              </div>
+            )}
+          </div>
 
-        {/* BIO */}
-        <div
-          style={{
-            position: 'absolute',
-            left: CARD_PAD,
-            top:  BIO_Y,
-            width:  CARD_W - 2 * CARD_PAD,
-            color: MUTED_TEXT,
-            fontFamily: "'Satoshi', system-ui, sans-serif",
-            fontWeight: 500,
-            fontSize: 22,
-            lineHeight: 1.35,
-            letterSpacing: '-0.005em',
-            transform: `translateY(${bioAnim.translateY}px)`,
-            opacity: bioAnim.opacity,
-          }}
-        >
-          {bio}
+          {/* BIO */}
+          <div
+            style={{
+              width:  '100%',
+              color: MUTED_TEXT,
+              fontFamily: "'Satoshi', system-ui, sans-serif",
+              fontWeight: 500,
+              fontSize: 22,
+              lineHeight: 1.35,
+              letterSpacing: '-0.005em',
+              overflowWrap: 'break-word',
+              wordBreak: 'break-word',
+              transform: `translateY(${bioAnim.translateY}px)`,
+              opacity: bioAnim.opacity,
+            }}
+          >
+            {bio}
+          </div>
         </div>
 
         {/* BOTTOM ROW */}
@@ -585,8 +609,9 @@ export const CharacterTeam6Card: React.FC<CharacterTeam6CardProps> = ({
               width:  FOLLOW_W,
               height: FOLLOW_H,
               borderRadius: FOLLOW_H / 2,
-              background: CARD_BG,
-              border: `1px solid ${FOLLOW_BORDER}`,
+              // Filled with the accent colour to match the verified tick.
+              background: accentColor,
+              border: 'none',
               boxShadow: BUTTON_SHADOW,
               display: 'flex',
               alignItems: 'center',
@@ -599,7 +624,7 @@ export const CharacterTeam6Card: React.FC<CharacterTeam6CardProps> = ({
           >
             <span
               style={{
-                color: DARK_TEXT,
+                color: '#FFFFFF',
                 fontFamily: "'Satoshi', system-ui, sans-serif",
                 fontWeight: 700,
                 fontSize: 20,
@@ -608,7 +633,7 @@ export const CharacterTeam6Card: React.FC<CharacterTeam6CardProps> = ({
             >
               Follow
             </span>
-            <PlusIcon size={18} color={DARK_TEXT} />
+            <PlusIcon size={18} color="#FFFFFF" />
           </div>
         </div>
       </div>
@@ -619,16 +644,15 @@ export const CharacterTeam6Card: React.FC<CharacterTeam6CardProps> = ({
 // ─── Demo / test props ───────────────────────────────────────────────────────
 
 export const characterTeam6CardDefaultProps: CharacterTeam6CardProps = {
-  // 6 characters in a single row, alternating gender + diverse mix.
-  // All PNGs are square (1024 or 1254), so a single characterHeight
-  // (~620) gives consistent head sizes across the team.
+  // 6 library presenter portraits (NOT daniel/lena). Size is fixed for every
+  // slot, so just pick ids + per-character titles.
   characters: [
-    { characterId: 'amelia', characterHeight: 620, characterY: 0, characterTitle: 'Product Lead' },
-    { characterId: 'ken',    characterHeight: 620, characterY: 0, characterTitle: 'Engineer' },
-    { characterId: 'sarah',  characterHeight: 620, characterY: 0, characterTitle: 'Designer' },
-    { characterId: 'robert', characterHeight: 620, characterY: 0, characterTitle: 'Founder' },
-    { characterId: 'claire', characterHeight: 620, characterY: 0, characterTitle: 'Researcher' },
-    { characterId: 'rebecca', characterHeight: 620, characterY: 0, characterTitle: 'Operations' },
+    { characterId: 'male_middleage_white',     characterTitle: 'Product Lead' },
+    { characterId: 'male_earlycareer_black',   characterTitle: 'Engineer' },
+    { characterId: 'female_earlycareer_white', characterTitle: 'Designer' },
+    { characterId: 'male_middleage_black',     characterTitle: 'Founder' },
+    { characterId: 'female_midcareer_white',   characterTitle: 'Researcher' },
+    { characterId: 'female_earlycareer_black', characterTitle: 'Operations' },
   ],
   title:    'Founding Team',
   verified: true,

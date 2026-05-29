@@ -30,15 +30,21 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const cardSchema = z.object({
+  // Character identity only. Size + position are FIXED for every card
+  // (CHARACTER_HEIGHT / CHARACTER_Y) so all heads come out the same size — you
+  // can't (and shouldn't) resize per card. Use a consistently-framed presenter
+  // portrait from the character library; do NOT use daniel.png or lena.png —
+  // they're framed/scaled differently from the rest and won't match.
   characterId:     z.string().min(1),
-  characterHeight: z.number().min(200).max(2400),
-  characterY:      z.number(),
   title:           z.string().min(1).max(22),
   verified:        z.boolean().optional(),
   bio:             z.string().min(1).max(80),
   followersCount:  z.number().int().nonnegative(),
   postsCount:      z.number().int().nonnegative(),
-  accentColor:     z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  // Accent colour — one of the three brand colours only: dodger blue,
+  // wild strawberry, or ocean green. Tints the portrait panel, the verified
+  // tick, and the Follow button.
+  accentColor:     z.enum(['#0496FF', '#F865B0', '#3AB795']),
 });
 
 export const characterDuoCardsTimingsSchema = z
@@ -76,12 +82,15 @@ export const characterDuoCardsMeta = {
     'person panel. Cards pop in left-to-right with a subtle overshoot.',
   authoringNotes:
     'Always supply exactly 2 cards. Per-card: characterId (PNG in ' +
-    'characters/<id>.png), characterHeight (rendered px height — tune ' +
-    'so head sizes match), characterY (pixel top offset — negative to ' +
-    'crop upward; tune to align hair-tops). title (≤22 chars — workplace ' +
-    'role, NOT name). bio ≤80 chars. accentColor hex. Default duration ' +
-    '450 frames (15 s); both cards land sequentially over ~2.1 s, content ' +
-    'fills over the next ~1.5 s.',
+    'characters/<id>.png) — use a consistently-framed presenter portrait from ' +
+    'the character library; do NOT use daniel.png or lena.png (different ' +
+    'framing/scale, won\'t match). Character size + position are FIXED for every ' +
+    'card so all heads match — just pick the id, nothing to tune. title (≤22 ' +
+    'chars — workplace role, NOT name). bio ≤80 chars. accentColor is one of ' +
+    'three brand colours only: #0496FF (dodger blue), #F865B0 (wild strawberry), ' +
+    'or #3AB795 (ocean green) — it tints the portrait panel, the verified tick, ' +
+    'and the Follow button. Default duration 450 frames (15 s); both cards land ' +
+    'sequentially over ~2.1 s, content fills over the next ~1.5 s.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -111,6 +120,13 @@ const PORTRAIT_W = CARD_W - 2 * CARD_PAD;      // 524
 const PORTRAIT_H = 520;
 const PORTRAIT_RADIUS = 24;
 
+// Fixed character framing for EVERY card — not authorable. Sized so a
+// consistently-framed library presenter portrait shows head + shoulders + chest
+// at a matching head size across all cards. (daniel/lena are excluded because
+// their source framing differs and would break this.)
+const CHARACTER_HEIGHT = 760;
+const CHARACTER_Y      = -10;
+
 // Bottom row + Follow button.
 const BOTTOM_ROW_Y = CARD_H - CARD_PAD - 48;
 const BOTTOM_ROW_H = 48;
@@ -118,9 +134,9 @@ const FOLLOW_W = 132;
 const FOLLOW_H = 48;
 const FOLLOW_LEFT = CARD_W - CARD_PAD - FOLLOW_W;
 
-// Vertical positions of title + bio (card-local).
+// Vertical start of the title + bio text column (card-local). The bio flows
+// below the title, so its position follows the title's height automatically.
 const TITLE_Y = CARD_PAD + PORTRAIT_H + 24;
-const BIO_Y   = TITLE_Y + 56;
 
 // ─── Animation timings ───────────────────────────────────────────────────────
 
@@ -159,7 +175,6 @@ const DARK_TEXT  = '#0A0F18';
 const MUTED_TEXT = '#6B7280';
 const ICON_GREY  = '#9CA3AF';
 const VERIFIED_FG = '#FFFFFF';
-const FOLLOW_BORDER = '#E5E7EB';
 
 const CARD_SHADOW =
   '0 24px 50px rgba(15, 25, 45, 0.10), ' +
@@ -358,8 +373,8 @@ function Card({
           style={{
             position: 'absolute',
             left: '50%',
-            top:  card.characterY,
-            height: card.characterHeight,
+            top:  CHARACTER_Y,
+            height: CHARACTER_HEIGHT,
             width: 'auto',
             transform: 'translateX(-50%)',
             filter:
@@ -369,63 +384,78 @@ function Card({
         />
       </div>
 
-      {/* TITLE ROW */}
+      {/* TITLE + BIO — a flowing column. Long text wraps onto the next line
+          and the bio is pushed DOWN (instead of title/bio overlapping at fixed
+          positions). The card's overflow:hidden is the final guard, so text can
+          never spill past the card onto the platinum background. */}
       <div
         style={{
           position: 'absolute',
           left: CARD_PAD,
           top:  TITLE_Y,
+          width: CARD_W - 2 * CARD_PAD,
           display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          transform: `translateY(${titleAnim.translateY}px)`,
-          opacity: titleAnim.opacity,
+          flexDirection: 'column',
+          gap: 18,
         }}
       >
-        <span
+        {/* TITLE ROW */}
+        <div
           style={{
-            color: DARK_TEXT,
-            fontFamily: "'Satoshi', system-ui, sans-serif",
-            fontWeight: 700,
-            fontSize: 32,
-            letterSpacing: '-0.02em',
-            lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10,
+            transform: `translateY(${titleAnim.translateY}px)`,
+            opacity: titleAnim.opacity,
           }}
         >
-          {card.title}
-        </span>
-        {card.verified !== false && (
-          <div
+          <span
             style={{
-              transform: `scale(${badgeScale})`,
-              transformOrigin: '50% 50%',
-              opacity: badgeOpacity,
-              display: 'flex',
+              color: DARK_TEXT,
+              fontFamily: "'Satoshi', system-ui, sans-serif",
+              fontWeight: 700,
+              fontSize: 32,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              overflowWrap: 'break-word',
+              wordBreak: 'break-word',
             }}
           >
-            <VerifiedBadge size={26} fill={card.accentColor} />
-          </div>
-        )}
-      </div>
+            {card.title}
+          </span>
+          {card.verified !== false && (
+            <div
+              style={{
+                transform: `scale(${badgeScale})`,
+                transformOrigin: '50% 50%',
+                opacity: badgeOpacity,
+                display: 'flex',
+              }}
+            >
+              <VerifiedBadge size={26} fill={card.accentColor} />
+            </div>
+          )}
+        </div>
 
-      {/* BIO */}
-      <div
-        style={{
-          position: 'absolute',
-          left: CARD_PAD,
-          top:  BIO_Y,
-          width:  CARD_W - 2 * CARD_PAD,
-          color: MUTED_TEXT,
-          fontFamily: "'Satoshi', system-ui, sans-serif",
-          fontWeight: 500,
-          fontSize: 20,
-          lineHeight: 1.35,
-          letterSpacing: '-0.005em',
-          transform: `translateY(${bioAnim.translateY}px)`,
-          opacity: bioAnim.opacity,
-        }}
-      >
-        {card.bio}
+        {/* BIO */}
+        <div
+          style={{
+            width: '100%',
+            color: MUTED_TEXT,
+            fontFamily: "'Satoshi', system-ui, sans-serif",
+            fontWeight: 500,
+            fontSize: 20,
+            lineHeight: 1.35,
+            letterSpacing: '-0.005em',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-word',
+            transform: `translateY(${bioAnim.translateY}px)`,
+            opacity: bioAnim.opacity,
+          }}
+        >
+          {card.bio}
+        </div>
       </div>
 
       {/* BOTTOM ROW */}
@@ -499,8 +529,9 @@ function Card({
             width:  FOLLOW_W,
             height: FOLLOW_H,
             borderRadius: FOLLOW_H / 2,
-            background: CARD_BG,
-            border: `1px solid ${FOLLOW_BORDER}`,
+            // Filled with the card's accent colour to match the verified tick.
+            background: card.accentColor,
+            border: 'none',
             boxShadow: BUTTON_SHADOW,
             display: 'flex',
             alignItems: 'center',
@@ -513,7 +544,7 @@ function Card({
         >
           <span
             style={{
-              color: DARK_TEXT,
+              color: '#FFFFFF',
               fontFamily: "'Satoshi', system-ui, sans-serif",
               fontWeight: 700,
               fontSize: 19,
@@ -522,7 +553,7 @@ function Card({
           >
             Follow
           </span>
-          <PlusIcon size={18} color={DARK_TEXT} />
+          <PlusIcon size={18} color="#FFFFFF" />
         </div>
       </div>
     </div>
@@ -585,13 +616,11 @@ export const CharacterDuoCards: React.FC<CharacterDuoCardsProps> = ({
 // ─── Demo / test props ───────────────────────────────────────────────────────
 
 export const characterDuoCardsDefaultProps: CharacterDuoCardsProps = {
-  // Same proven head-size + hair-top tuning as the trio template, sized
-  // so each character's head measures ≈ 210 px in the rendered portrait.
+  // Library presenter portraits only (NOT daniel/lena). Size + position are
+  // fixed for every card, so just pick an id — no per-card tuning.
   cards: [
     {
-      characterId:    'daniel',
-      characterHeight: 800,
-      characterY:      -12,
+      characterId:    'male_middleage_white',
       title:           'Product Strategist',
       verified:        true,
       bio:             'Helping early-stage teams ship faster and sharper.',
@@ -600,9 +629,7 @@ export const characterDuoCardsDefaultProps: CharacterDuoCardsProps = {
       accentColor:     '#0496FF',   // dodger blue
     },
     {
-      characterId:    'lena',
-      characterHeight: 640,
-      characterY:      -45,
+      characterId:    'female_earlycareer_black',
       title:           'Head of Design',
       verified:        true,
       bio:             'Building product systems people actually love to use.',

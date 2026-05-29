@@ -32,11 +32,11 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const slotSchema = z.object({
+  // Character PNG id only. Size + position are FIXED per slot (front vs side —
+  // see FRONT_CHARACTER_* / SIDE_CHARACTER_*) so characters never vary in size;
+  // the front/back depth comes from the fixed slot geometry, not author tuning.
+  // Use consistently-framed library presenter portraits (NOT daniel/lena).
   characterId:     z.string().min(1),
-  // Rendered height of the character image in px.
-  characterHeight: z.number().min(200).max(2000),
-  // Top offset inside the slot. Negative crops the top of the image.
-  characterY:      z.number(),
 });
 
 export const characterTeamCardTimingsSchema = z
@@ -69,8 +69,10 @@ export const characterTeamCardSchema = z.object({
   bio:      z.string().min(1).max(95),
   followersCount: z.number().int().nonnegative(),
   postsCount:     z.number().int().nonnegative(),
-  // Single accent colour for the whole card (portrait BG + verified tick).
-  accentColor:    z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  // Single accent colour for the whole card — one of three brand colours only:
+  // dodger blue, wild strawberry, or ocean green. Tints the portrait BG, the
+  // verified tick, and the Follow button.
+  accentColor:    z.enum(['#0496FF', '#F865B0', '#3AB795']),
   timings:        characterTeamCardTimingsSchema.optional(),
 });
 
@@ -85,12 +87,16 @@ export const characterTeamCardMeta = {
     'character steps forward with a stronger overshoot so the layering ' +
     'reads as deliberate depth.',
   authoringNotes:
-    'Supply front, leftBack, and rightBack — each is a slot with ' +
-    'characterId (PNG in characters/<id>.png), characterHeight (rendered ' +
-    'px height — tune so heads match), and characterY (top offset, ' +
-    'usually negative to crop). title ≤24 chars (e.g. "Product Team"). ' +
-    'bio ≤95 chars. accentColor is a single hex applied to the portrait ' +
-    'BG and the verified badge. Default duration 450 frames (15 s).',
+    'Supply front, leftBack, and rightBack — each is just a characterId ' +
+    '(PNG in characters/<id>.png). Use consistently-framed library presenter ' +
+    'portraits; do NOT use daniel.png or lena.png. Character size + position ' +
+    'are FIXED per slot (front a touch larger to read as forward; the two ' +
+    'backs equal and slightly smaller) so characters never vary in size — ' +
+    'just pick ids. title ≤24 chars (e.g. "Product Team"). bio ≤95 chars ' +
+    '(wraps onto the next line, kept inside the card). accentColor is one of ' +
+    'three brand colours only: #0496FF (dodger blue), #F865B0 (wild ' +
+    'strawberry), or #3AB795 (ocean green) — tints the portrait BG, the ' +
+    'verified tick, and the Follow button. Default duration 450 frames (15 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -128,6 +134,16 @@ const FRONT_SLOT_H = PORTRAIT_H;
 const LEFT_SLOT_X  = 30;
 const RIGHT_SLOT_X = PORTRAIT_W - SIDE_SLOT_W - 30;  // 630
 const FRONT_SLOT_X = (PORTRAIT_W - FRONT_SLOT_W) / 2; // 290
+
+// Fixed character framing per slot — NOT authorable. Sized for consistently-
+// framed library presenter portraits (square). Scaled up to a head-and-
+// shoulders crop: the figure is large enough that the narrow slot clips past
+// the arms (no mid-arm cut) and the portrait-bottom cut lands on the upper
+// chest. Front renders a touch larger so it reads as stepping forward.
+const FRONT_CHARACTER_HEIGHT = 700;
+const FRONT_CHARACTER_Y      = -12;
+const SIDE_CHARACTER_HEIGHT  = 640;
+const SIDE_CHARACTER_Y       = 4;
 
 // Vertical positions of title + bio + bottom row (card-local).
 const TITLE_Y      = CARD_PAD + PORTRAIT_H + 26;  // 30 + 600 + 26 = 656
@@ -174,7 +190,6 @@ const DARK_TEXT  = '#0A0F18';
 const MUTED_TEXT = '#6B7280';
 const ICON_GREY  = '#9CA3AF';
 const VERIFIED_FG = '#FFFFFF';
-const FOLLOW_BORDER = '#E5E7EB';
 
 const CARD_SHADOW =
   '0 30px 60px rgba(15, 25, 45, 0.12), ' +
@@ -288,6 +303,8 @@ function CharacterSlot({
   slotH,
   zIndex,
   scale,
+  charHeight,
+  charY,
 }: {
   slot:    CharacterSlotData;
   slotX:   number;
@@ -296,6 +313,8 @@ function CharacterSlot({
   slotH:   number;
   zIndex:  number;
   scale:   number;
+  charHeight: number;
+  charY:      number;
 }) {
   return (
     <div
@@ -317,8 +336,8 @@ function CharacterSlot({
         style={{
           position: 'absolute',
           left: '50%',
-          top:  slot.characterY,
-          height: slot.characterHeight,
+          top:  charY,
+          height: charHeight,
           width: 'auto',
           transform: 'translateX(-50%)',
           filter:
@@ -422,6 +441,8 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
             slotH={SIDE_SLOT_H}
             zIndex={1}
             scale={charScale}
+            charHeight={SIDE_CHARACTER_HEIGHT}
+            charY={SIDE_CHARACTER_Y}
           />
           {/* RIGHT BACK */}
           <CharacterSlot
@@ -432,6 +453,8 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
             slotH={SIDE_SLOT_H}
             zIndex={1}
             scale={charScale}
+            charHeight={SIDE_CHARACTER_HEIGHT}
+            charY={SIDE_CHARACTER_Y}
           />
           {/* FRONT — on top */}
           <CharacterSlot
@@ -442,17 +465,31 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
             slotH={FRONT_SLOT_H}
             zIndex={2}
             scale={charScale}
+            charHeight={FRONT_CHARACTER_HEIGHT}
+            charY={FRONT_CHARACTER_Y}
           />
         </div>
 
-        {/* TITLE ROW */}
+        {/* TITLE + BIO — flowing column. Long text wraps onto the next line and
+            the bio is pushed down (no fixed-position overlap); the card's
+            overflow:hidden keeps everything off the canvas background. */}
         <div
           style={{
             position: 'absolute',
             left: CARD_PAD,
             top:  TITLE_Y,
+            width: CARD_W - 2 * CARD_PAD,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+          }}
+        >
+        {/* TITLE ROW */}
+        <div
+          style={{
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
             gap: 12,
             transform: `translateY(${titleAnim.translateY}px)`,
             opacity: titleAnim.opacity,
@@ -465,7 +502,9 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
               fontWeight: 700,
               fontSize: 40,
               letterSpacing: '-0.02em',
-              lineHeight: 1,
+              lineHeight: 1.1,
+              overflowWrap: 'break-word',
+              wordBreak: 'break-word',
             }}
           >
             {title}
@@ -487,21 +526,21 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
         {/* BIO */}
         <div
           style={{
-            position: 'absolute',
-            left: CARD_PAD,
-            top:  BIO_Y,
-            width:  CARD_W - 2 * CARD_PAD,
+            width:  '100%',
             color: MUTED_TEXT,
             fontFamily: "'Satoshi', system-ui, sans-serif",
             fontWeight: 500,
             fontSize: 22,
             lineHeight: 1.35,
             letterSpacing: '-0.005em',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-word',
             transform: `translateY(${bioAnim.translateY}px)`,
             opacity: bioAnim.opacity,
           }}
         >
           {bio}
+        </div>
         </div>
 
         {/* BOTTOM ROW */}
@@ -575,8 +614,9 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
               width:  FOLLOW_W,
               height: FOLLOW_H,
               borderRadius: FOLLOW_H / 2,
-              background: CARD_BG,
-              border: `1px solid ${FOLLOW_BORDER}`,
+              // Filled with the accent colour to match the verified tick.
+              background: accentColor,
+              border: 'none',
               boxShadow: BUTTON_SHADOW,
               display: 'flex',
               alignItems: 'center',
@@ -589,7 +629,7 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
           >
             <span
               style={{
-                color: DARK_TEXT,
+                color: '#FFFFFF',
                 fontFamily: "'Satoshi', system-ui, sans-serif",
                 fontWeight: 700,
                 fontSize: 20,
@@ -598,7 +638,7 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
             >
               Follow
             </span>
-            <PlusIcon size={18} color={DARK_TEXT} />
+            <PlusIcon size={18} color="#FFFFFF" />
           </div>
         </div>
       </div>
@@ -609,30 +649,11 @@ export const CharacterTeamCard: React.FC<CharacterTeamCardProps> = ({
 // ─── Demo / test props ───────────────────────────────────────────────────────
 
 export const characterTeamCardDefaultProps: CharacterTeamCardProps = {
-  // Daniel steps forward as the team-front. Lena (left-back) and Mark
-  // (right-back) flank him slightly behind. Heights tuned so the chest
-  // of each back character extends to the bottom of the slot (no blue
-  // gap below) and head sizes feel proportional.
-  front: {
-    characterId:    'daniel',
-    characterHeight: 840,
-    characterY:     -10,
-  },
-  leftBack: {
-    // Bumped to 680 (was 580) so Lena reads bigger, and characterY -50
-    // pushes her image so the bottom (chest) reaches the slot bottom.
-    characterId:    'lena',
-    characterHeight: 680,
-    characterY:     -50,
-  },
-  rightBack: {
-    // Shrunk to 600 (was 700) so Mark no longer dwarfs Lena.
-    // characterY 50 lowers him so his head sits visibly behind the
-    // front character's eyeline, giving the "behind" perspective.
-    characterId:    'mark',
-    characterHeight: 600,
-    characterY:     50,
-  },
+  // Library presenter portraits only (NOT daniel/lena). Size + position are
+  // fixed per slot (front a touch larger, two backs equal), so just pick ids.
+  front:     { characterId: 'male_middleage_white' },
+  leftBack:  { characterId: 'female_earlycareer_black' },
+  rightBack: { characterId: 'male_middleage_black' },
   title:    'Product Team',
   verified: true,
   bio:      'Three of us, shipping the product roadmap end-to-end every sprint.',
