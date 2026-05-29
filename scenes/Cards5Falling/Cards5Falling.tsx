@@ -24,27 +24,33 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const cardSchema = z.object({
-  // Header title pill — bold white, single line, ~24 char ceiling.
+  // Header title — bold white, single line, kept INSIDE the dodger-blue header
+  // box. ~24-char ceiling so it fits on one line; the title is also width-capped
+  // and clipped in the layout so it can never spill past the box onto the
+  // platinum background.
   title: z.string().min(1).max(24),
   // Icon ID from the catalog's available_icons list (e.g. "edit").
   icon: z.string().min(1),
 });
 
 // Optional per-render timing overrides. All values are in SECONDS (the
-// scene runs at 30 fps and converts internally). dropStarts must contain
-// exactly 5 entries — one per card. Any field omitted falls back to the
-// corresponding DEFAULT_TIMINGS entry.
+// scene runs at 30 fps and converts internally). dropStarts should have at
+// least as many entries as there are cards (1–5); only the first cards.length
+// are used. Any field omitted falls back to the corresponding DEFAULT_TIMINGS
+// entry (which supplies all 5 drop starts).
 export const cards5FallingTimingsSchema = z
   .object({
     entryDuration: z.number().positive(),
-    dropStarts: z.array(z.number().nonnegative()).length(5),
+    dropStarts: z.array(z.number().nonnegative()).min(1).max(5),
     dropDuration: z.number().positive(),
   })
   .partial();
 
 export const cards5FallingSchema = z.object({
-  // Exactly 5 items — one per stacked card, ordered top-of-stack first.
-  cards: z.array(cardSchema).min(5).max(5),
+  // 1 to 5 cards — one per stacked card, ordered top-of-stack first. Each card
+  // occupies the same centred position and falls in turn, so fewer cards simply
+  // means a shorter sequence (no layout reflow needed).
+  cards: z.array(cardSchema).min(1).max(5),
   // Optional animation timing overrides (seconds, internally converted to frames @ 30fps).
   timings: cards5FallingTimingsSchema.optional(),
 });
@@ -57,12 +63,18 @@ export const cards5FallingMeta = {
     'a blue-gradient header (bookmark icon + bold title) above an Oxford Blue body ' +
     'panel showing a single large white-tinted icon.',
   authoringNotes:
-    'Provide exactly 5 cards. Each needs an icon id from the catalog\'s ' +
-    'available_icons list and a short title — strict 24-character max, bold white in ' +
-    'the header. Write tight noun phrases (2–4 words). GOOD: "Edit notes", "Watch lecture", ' +
-    '"Track progress". BAD: "Edit your course notes", "Watch the video lecture" (too long). ' +
-    'Cards land top-down in the order supplied — index 0 is the first card to enter and ' +
-    'the first to drop. Default duration 450 frames (15 s).',
+    'Provide 1 to 5 cards — each falls in turn at the same centred position, so ' +
+    'fewer cards just makes a shorter sequence. Each needs an icon id and a short ' +
+    'title — strict 24-character max, bold white, kept inside the dodger-blue header ' +
+    'box (width-capped and clipped, so it never spills onto the platinum background). ' +
+    'Write tight noun phrases (2–4 words). Use DARK-MODE icons ' +
+    '(the "-dark" suffix in the Library): these are platinum-white + dodger-blue and ' +
+    'read clearly on the Oxford-Blue card body. "-light" icons have a dark element ' +
+    'that disappears on the body. Give each card a DIFFERENT icon. Write tight noun ' +
+    'phrases (2–4 words). GOOD: "Edit notes", "Watch lecture", "Track progress". ' +
+    'BAD: "Edit your course notes" (too long). Cards land top-down in the order ' +
+    'supplied — index 0 is the first to enter and the first to drop. Default ' +
+    'duration 450 frames (15 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -88,6 +100,10 @@ const BOOKMARK_LEFT = 480;
 const BOOKMARK_SIZE = 80;
 const BOOKMARK_TOP  = HEADER_CY - BOOKMARK_SIZE / 2;
 const TITLE_LEFT    = BOOKMARK_LEFT + BOOKMARK_SIZE + 32;
+// Max width the title may occupy before the card's right edge — keeps the title
+// INSIDE the dodger-blue header box (clipped, never spilling onto the platinum
+// background). 44px right padding mirrors the bookmark's left inset.
+const TITLE_MAX_WIDTH = CARD_RIGHT - TITLE_LEFT - 44;
 
 // Body icon — large central placeholder.
 const BODY_ICON_SIZE = 380;
@@ -160,7 +176,7 @@ function Card({
   dropStarts,
   dropDur,
 }: {
-  index: 0 | 1 | 2 | 3 | 4;
+  index: number;        // 0-based position in the stack (0 = first to enter/drop)
   title: string;
   icon: string;
   entryDur: number;
@@ -247,6 +263,10 @@ function Card({
           fontSize: 55,
           letterSpacing: '-0.01em',
           whiteSpace: 'nowrap',
+          // Stay inside the header box — clip rather than spill onto the platinum bg.
+          maxWidth: TITLE_MAX_WIDTH,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
         }}
       >
         {title}
@@ -292,10 +312,11 @@ export const Cards5Falling: React.FC<Cards5FallingProps> = ({ cards, timings }) 
   const DROP_STARTS = t.dropStarts.map(f);
   const DROP_DUR   = f(t.dropDuration);
 
-  // Render cards 5 → 1 so Card 1 is the LAST DOM child and naturally sits
-  // on top of the others (matching the "stack of cards" semantics — cards
-  // 2–5 are physically underneath, hidden until needed).
-  const renderOrder: Array<0 | 1 | 2 | 3 | 4> = [4, 3, 2, 1, 0];
+  // Render last → first so card 0 is the LAST DOM child and naturally sits on
+  // top of the others (matching the "stack of cards" semantics — later cards
+  // are physically underneath, hidden until needed). Derived from the actual
+  // card count so 1–5 cards all stack correctly.
+  const renderOrder = Array.from({ length: cards.length }, (_, i) => i).reverse();
 
   return (
     <AbsoluteFill style={{ background: '#E6ECF2', overflow: 'hidden' }}>
