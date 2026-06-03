@@ -56,7 +56,8 @@ export const circlePoints4CharacterTimingsSchema = z
   .partial();
 
 export const circlePoints4CharacterSchema = z.object({
-  points:  z.array(pointSchema).length(4),
+  // 1 to 4 items — the circle row auto-centres horizontally for the count.
+  points:  z.array(pointSchema).min(1).max(4),
   timings: circlePoints4CharacterTimingsSchema.optional(),
 });
 
@@ -70,7 +71,8 @@ export const circlePoints4CharacterMeta = {
     'label-fade animation as the icon variant (CirclePoints4); only the ' +
     'circle contents differ.',
   authoringNotes:
-    'Provide exactly 4 items. Each needs a characterId (PNG in ' +
+    'Provide 1 to 4 items — the circle row auto-centres horizontally for the ' +
+    'count (2 circles sit centred, etc.). Each needs a characterId (PNG in ' +
     'characters/<id>.png with proper alpha), optional characterHeight + ' +
     'characterY for face-centring, and a label (≤20 chars). Tune ' +
     'characterHeight (default 480) and characterY (default 61) per PNG ' +
@@ -85,9 +87,12 @@ const SATOSHI_BOLD_SRC = staticFile('fonts/Satoshi-Bold.woff2');
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-// Lifted verbatim from CirclePoints4 so the rest of the layout (label
-// positions, pop timing) is identical between the icon + character variants.
-const CIRCLE_CXS = [315, 755, 1196, 1637] as const;
+// Circle row — auto-centred horizontally for 1-4 circles (matches CirclePoints4).
+// Pitch (440) is the spacing from the prototype's centres [315,755,1196,1637].
+const CANVAS_CX    = 960;
+const CIRCLE_PITCH = 440;
+const circleCxFor = (count: number, i: number) =>
+  CANVAS_CX - ((count - 1) * CIRCLE_PITCH) / 2 + i * CIRCLE_PITCH;
 const CIRCLE_CY  = 533;
 const CIRCLE_D   = 382;
 
@@ -139,7 +144,7 @@ function loadFonts(): Promise<void> {
 // ─── Single circle ────────────────────────────────────────────────────────────
 
 function CircleCharacter({
-  index,
+  cx,
   frame,
   characterId,
   characterHeight,
@@ -151,7 +156,7 @@ function CircleCharacter({
   p2Dur,
   textFadeDur,
 }: {
-  index: 0 | 1 | 2 | 3;
+  cx: number;
   frame: number;
   characterId: string;
   characterHeight: number;
@@ -163,7 +168,6 @@ function CircleCharacter({
   p2Dur: number;
   textFadeDur: number;
 }) {
-  const cx = CIRCLE_CXS[index];
 
   // Pass 1: easeOutBack scale 0 → 1.
   const p1Prog = interpolate(frame, [p1Start, p1Start + p1Dur], [0, 1], {
@@ -287,15 +291,15 @@ export const CirclePoints4Character: React.FC<CirclePoints4CharacterProps> = ({
 
   return (
     <AbsoluteFill style={{ background: '#E6ECF2', overflow: 'hidden' }}>
-      {([0, 1, 2, 3] as const).map(i => (
+      {points.map((p, i) => (
         <CircleCharacter
           key={i}
-          index={i}
+          cx={circleCxFor(points.length, i)}
           frame={frame}
-          characterId={points[i]!.characterId}
-          characterHeight={points[i]!.characterHeight ?? DEFAULT_CHARACTER_HEIGHT}
-          characterY={points[i]!.characterY ?? DEFAULT_CHARACTER_Y}
-          label={points[i]!.label}
+          characterId={p.characterId}
+          characterHeight={p.characterHeight ?? DEFAULT_CHARACTER_HEIGHT}
+          characterY={p.characterY ?? DEFAULT_CHARACTER_Y}
+          label={p.label}
           p1Start={P1_STARTS[i]!}
           p1Dur={P1_DUR}
           p2Start={P2_STARTS[i]!}

@@ -28,7 +28,8 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const pointSchema = z.object({
-  // Icon ID from icons/ (e.g. "rocket", "award", "laptop", "goal").
+  // Icon ID from the icon library — any icon works; it's forced solid white
+  // at runtime (see the icon Img filter), so it reads on the blue disc.
   icon:  z.string().min(1),
   // Pill caption — bold black under each circle. ≤20 chars at 37 px.
   label: z.string().min(1).max(20),
@@ -47,8 +48,9 @@ export const circlePoints4TimingsSchema = z
   .partial();
 
 export const circlePoints4Schema = z.object({
-  // Exactly 4 points — one per circle, ordered left → right.
-  points: z.array(pointSchema).length(4),
+  // 1 to 4 points — one per circle, ordered left → right. The row auto-centres
+  // horizontally for the count (e.g. 2 circles sit centred in the frame).
+  points: z.array(pointSchema).min(1).max(4),
   timings: circlePoints4TimingsSchema.optional(),
 });
 
@@ -60,12 +62,13 @@ export const circlePoints4Meta = {
     'white icon and reveals a bold black label beneath it. Circles pop in ' +
     'one-by-one (easeOutBack), then each pulses while its label fades in.',
   authoringNotes:
-    'Provide exactly 4 items. Each item needs an icon id from the catalog\'s ' +
-    'available_icons list and a short label — strict 20-character max, bold ' +
-    'black below each circle. Write tight noun phrases (1–3 words). GOOD: ' +
-    '"Data quality", "Fast queries", "Low cost", "Easy setup". BAD: "Improve ' +
-    'data quality", "Runs queries faster" (too long — strip verbs, keep the ' +
-    'noun core). Default duration 300 frames (10 s).',
+    'Provide 1 to 4 items — the circle row auto-centres horizontally for the ' +
+    'count (2 circles sit centred, etc.). Each item needs an icon id from the ' +
+    'icon library (any icon — it is forced solid white to read on the blue ' +
+    'disc) and a short label — strict 20-character max, bold black below each ' +
+    'circle. Write tight noun phrases (1–3 words). GOOD: "Data quality", "Fast ' +
+    'queries", "Low cost", "Easy setup". BAD: "Improve data quality" (too long ' +
+    '— strip verbs, keep the noun core). Default duration 300 frames (10 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -75,8 +78,12 @@ const SATOSHI_BOLD_SRC = staticFile('fonts/Satoshi-Bold.woff2');
 
 // ─── Layout constants (lifted from the prototype) ─────────────────────────────
 
-// Final-comp circle centres. Verbatim from the HTML.
-const CIRCLE_CXS = [315, 755, 1196, 1637] as const;
+// Circle row — auto-centred horizontally for 1-4 circles. Pitch (440) is the
+// spacing taken from the prototype's column centres [315, 755, 1196, 1637].
+const CANVAS_CX    = 960;
+const CIRCLE_PITCH = 440;
+const circleCxFor = (count: number, i: number) =>
+  CANVAS_CX - ((count - 1) * CIRCLE_PITCH) / 2 + i * CIRCLE_PITCH;
 const CIRCLE_CY  = 533;
 const CIRCLE_D   = 382;
 
@@ -125,7 +132,7 @@ function loadFonts(): Promise<void> {
 // ─── Single circle ────────────────────────────────────────────────────────────
 
 function CirclePoint({
-  index,
+  cx,
   frame,
   icon,
   label,
@@ -135,7 +142,7 @@ function CirclePoint({
   p2Dur,
   textFadeDur,
 }: {
-  index: 0 | 1 | 2 | 3;
+  cx: number;
   frame: number;
   icon: string;
   label: string;
@@ -145,7 +152,6 @@ function CirclePoint({
   p2Dur: number;
   textFadeDur: number;
 }) {
-  const cx = CIRCLE_CXS[index];
 
   // Pass 1: easeOutBack scale 0 → 1.
   const p1Prog = interpolate(frame, [p1Start, p1Start + p1Dur], [0, 1], {
@@ -212,7 +218,8 @@ function CirclePoint({
           <Img
             src={staticFile(`icons/${icon}.svg`)}
             alt=""
-            style={{ width: ICON_SIZE, height: ICON_SIZE }}
+            // Force any source icon to solid white so it reads on the blue disc.
+            style={{ width: ICON_SIZE, height: ICON_SIZE, filter: 'brightness(0) invert(1)' }}
           />
         </div>
       </div>
@@ -261,13 +268,13 @@ export const CirclePoints4: React.FC<CirclePoints4Props> = ({ points, timings })
 
   return (
     <AbsoluteFill style={{ background: '#E6ECF2', overflow: 'hidden' }}>
-      {([0, 1, 2, 3] as const).map(i => (
+      {points.map((p, i) => (
         <CirclePoint
           key={i}
-          index={i}
+          cx={circleCxFor(points.length, i)}
           frame={frame}
-          icon={points[i]!.icon}
-          label={points[i]!.label}
+          icon={p.icon}
+          label={p.label}
           p1Start={P1_STARTS[i]!}
           p1Dur={P1_DUR}
           p2Start={P2_STARTS[i]!}
