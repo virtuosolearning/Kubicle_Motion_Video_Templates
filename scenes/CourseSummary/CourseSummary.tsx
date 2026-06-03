@@ -30,14 +30,17 @@ export const courseSummaryTimingsSchema = z
     bannerStart:  z.number().nonnegative(),
     bannerEnd:    z.number().positive(),
     bannerFadeEnd: z.number().positive(),
-    pillStarts:   z.array(z.number().nonnegative()).length(6),
+    // 1 to 6 entries — should have at least `recaps.length`; only the first
+    // recaps.length entries are used.
+    pillStarts:   z.array(z.number().nonnegative()).min(1).max(6),
     pillDuration: z.number().positive(),
   })
   .partial();
 
 export const courseSummarySchema = z.object({
-  // Exactly 6 recap lines, ordered top → bottom in the final composition.
-  recaps: z.array(z.string().min(1).max(40)).length(6),
+  // 1 to 6 recap lines, ordered top → bottom. The pill band auto-centres
+  // vertically for the count (3 pills sit centred in the frame, etc.).
+  recaps: z.array(z.string().min(1).max(40)).min(1).max(6),
   timings: courseSummaryTimingsSchema.optional(),
 });
 
@@ -49,11 +52,14 @@ export const courseSummaryMeta = {
     'from above, each rolling out from under the previous. Best for summarising ' +
     'the 6 main takeaways of a lesson.',
   authoringNotes:
-    'Always supply exactly 6 recap lines. Each is bold black inside a coloured ' +
-    'pill — strict 40-character max, one line at 37 px in Satoshi Bold. Aim for ' +
-    'parallel structure (e.g. all noun phrases, all verb phrases). GOOD: ' +
-    '"Define your target audience". BAD: "It\'s important to define your target ' +
-    'audience first" (too long, not parallel). Default duration 450 frames (15 s).',
+    'Supply 1 to 6 recap lines — the pill band auto-centres vertically for the ' +
+    'count (3 pills sit centred in the frame, etc.). Each line is bold black ' +
+    'inside the white pill — 40-character max at 37 px in Satoshi Bold; if a ' +
+    'sentence is longer it wraps onto a second line inside the pill (never ' +
+    'spills onto the background). Aim for parallel structure (e.g. all noun ' +
+    'phrases, all verb phrases). GOOD: "Define your target audience". BAD: ' +
+    '"It\'s important to define your target audience first" (too long, not ' +
+    'parallel). Default duration 450 frames (15 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -64,20 +70,28 @@ const SATOSHI_BOLD_SRC = staticFile('fonts/Satoshi-Bold.woff2');
 
 // ─── Layout constants (lifted directly from the prototype) ────────────────────
 
-// Course_Summary_Pill.png places one pill at y=116..261 inside a 1920×1080 canvas.
+// Course_Summary_Pill.png places one pill at y=116..261 inside a 1920×1080
+// canvas; pill alpha-bbox runs x=605..1785.
 const PILL_ASSET_TOP = 116;
 const PILL_HEIGHT    = 145;
+const PILL_RIGHT     = 1785;
 
-// Final layout of the 6 pills (top y values).
-const FIRST_PILL_TOP = 80;
-const ROW_PITCH      = 155;
-const PILL_TOPS = [0, 1, 2, 3, 4, 5].map(i => FIRST_PILL_TOP + i * ROW_PITCH) as readonly number[];
-// Pill 1's entry starts off-canvas above; subsequent pills enter from
-// where the previous pill landed.
-const PILL_FROM_TOPS = PILL_TOPS.map((_, i) => i === 0 ? -160 : PILL_TOPS[i - 1]!);
+// Vertical layout — the band of `count` pills (1-6) auto-centres on the canvas.
+const ROW_PITCH = 155;
+const CANVAS_CY = 540;
+const firstPillTopFor = (count: number) =>
+  CANVAS_CY - ((count - 1) * ROW_PITCH + PILL_HEIGHT) / 2;
+const pillTopFor     = (count: number, i: number) => firstPillTopFor(count) + i * ROW_PITCH;
+// Pill 0's entry starts off-canvas above; each later pill enters from where
+// the previous one landed.
+const pillFromTopFor = (count: number, i: number) =>
+  i === 0 ? -160 : pillTopFor(count, i - 1);
 
-// Text position relative to the pill row.
-const TEXT_LEFT = 790;
+// Text position relative to the pill row. Width is capped to the pill's body
+// so a long sentence wraps onto a second line inside the pill (never spills
+// onto the background).
+const TEXT_LEFT      = 790;
+const TEXT_MAX_WIDTH = PILL_RIGHT - TEXT_LEFT - 30;   // 965
 
 // Banner enters from above.
 const BANNER_TRAVEL = -400;
@@ -218,21 +232,27 @@ function Pill({
         }}
       />
 
-      {/* Label centred vertically on the pill */}
+      {/* Label centred vertically on the pill. Width is capped to the pill body
+          and text wraps onto the next line if it's too long; vertical overflow
+          is clipped so it never spills past the pill onto the background. */}
       <div
         style={{
           position: 'absolute',
           left: TEXT_LEFT,
           top:  currentTop,
+          width:  TEXT_MAX_WIDTH,
           height: PILL_HEIGHT,
           display: 'flex',
           alignItems: 'center',
           fontFamily: "'Satoshi', system-ui, sans-serif",
           fontWeight: 700,
           fontSize: 37,
+          lineHeight: 1.15,
           color: '#000',
           letterSpacing: '-0.01em',
-          whiteSpace: 'nowrap',
+          overflowWrap: 'break-word',
+          wordBreak: 'break-word',
+          overflow: 'hidden',
         }}
       >
         {label}
@@ -262,16 +282,16 @@ export const CourseSummary: React.FC<CourseSummaryProps> = ({ recaps, timings })
 
   return (
     <AbsoluteFill style={{ background: '#E6ECF2', overflow: 'hidden' }}>
-      {/* Pills first so the banner (zIndex 100) sits on top */}
-      {([0, 1, 2, 3, 4, 5] as const).map(i => (
+      {/* Pills first so the banner (zIndex 100) sits on top. */}
+      {recaps.map((label, i) => (
         <Pill
           key={i}
           index={i}
-          label={recaps[i]!}
+          label={label}
           startFrame={PILL_STARTS[i]!}
           pillDur={PILL_DUR}
-          fromTop={PILL_FROM_TOPS[i]!}
-          toTop={PILL_TOPS[i]!}
+          fromTop={pillFromTopFor(recaps.length, i)}
+          toTop={pillTopFor(recaps.length, i)}
         />
       ))}
 
