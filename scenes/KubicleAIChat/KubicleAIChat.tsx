@@ -223,6 +223,23 @@ function loadFonts(): Promise<void> {
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const lerp    = (a: number, b: number, t: number) => a + (b - a) * t;
 
+// Estimate the end-state user-bubble box from the prompt text. Width follows
+// the same char-count heuristic as before; HEIGHT now fits the wrapped lines
+// (rather than a fixed 88px guess) so a long, multi-line prompt gets a
+// comfortably sized bubble instead of being crammed and overflowing the box.
+// The main scene calls this too, to push the AI response below a tall bubble
+// so the two never overlap. 0.52em is the approx average glyph width at the
+// bubble's font/weight; 1.35 is the bubble line-height.
+const USER_BUBBLE_FONT = 26;
+function estimateUserBubble(fullText: string): { w: number; h: number; fontSize: number } {
+  const w = Math.min(BUBBLE_MAX_W, Math.max(360, fullText.length * 14 + BUBBLE_PAD_X * 2));
+  const lineH        = USER_BUBBLE_FONT * 1.35;
+  const charsPerLine = Math.max(1, Math.floor((w - BUBBLE_PAD_X * 2) / (USER_BUBBLE_FONT * 0.52)));
+  const lines        = Math.max(1, Math.ceil(fullText.length / charsPerLine));
+  const h            = Math.max(88, Math.ceil(lines * lineH + BUBBLE_PAD_Y * 2));
+  return { w, h, fontSize: USER_BUBBLE_FONT };
+}
+
 // ─── Kubicle AI brand mark (white PNG logo on alpha) ─────────────────────────
 
 function SparkleIcon({ size = 36 }: { size?: number }) {
@@ -349,15 +366,17 @@ function MorphingPrompt({
   const startFontSize = 28;
   const startTextAlign: 'left' | 'right' = 'left';
 
-  // End bubble — sized to fit text. Approximate using char-count heuristic.
-  const endW    = Math.min(BUBBLE_MAX_W, Math.max(360, fullText.length * 14 + BUBBLE_PAD_X * 2));
+  // End bubble — width AND height sized to fit the wrapped text, so long
+  // prompts get a roomy bubble instead of overflowing a fixed 88px box.
+  const endBox  = estimateUserBubble(fullText);
+  const endW    = endBox.w;
   const endLeft = BUBBLE_RIGHT - endW;
   const endTop  = BUBBLE_TOP;
-  const endH    = 88; // approx for 1-2 lines
+  const endH    = endBox.h;
   const endRad  = BUBBLE_RADIUS;
   const endPadX = BUBBLE_PAD_X;
   const endPadY = BUBBLE_PAD_Y;
-  const endFontSize = 26;
+  const endFontSize = endBox.fontSize;
   const endTextAlign: 'left' | 'right' = 'left';
 
   const left = lerp(startLeft, endLeft, ease);
@@ -508,8 +527,8 @@ function MorphingPrompt({
 
 // ─── AI typing pulse ─────────────────────────────────────────────────────────
 
-function AITypingPulse({ frame, startF, opacity }: {
-  frame: number; startF: number; opacity: number;
+function AITypingPulse({ frame, startF, opacity, top }: {
+  frame: number; startF: number; opacity: number; top: number;
 }) {
   if (opacity <= 0) return null;
   const local = frame - startF;
@@ -518,7 +537,7 @@ function AITypingPulse({ frame, startF, opacity }: {
       style={{
         position: 'absolute',
         left: RESP_LEFT,
-        top:  BUBBLE_TOP + 130,
+        top,
         display: 'flex',
         alignItems: 'center',
         gap: 16,
@@ -560,7 +579,7 @@ function AITypingPulse({ frame, startF, opacity }: {
 
 function AIResponse({
   intro, sections, frame,
-  introStart, sectionStartFrames, sectionDurF, introDurF,
+  introStart, sectionStartFrames, sectionDurF, introDurF, responseTop,
 }: {
   intro: string;
   sections: { heading: string; body: string }[];
@@ -569,8 +588,8 @@ function AIResponse({
   sectionStartFrames: number[];
   sectionDurF: number;
   introDurF: number;
+  responseTop: number;     // top of the response block, below the user bubble
 }) {
-  const responseTop = BUBBLE_TOP + 130;  // below the typing-pulse area
 
   // Intro paragraph fade
   const introOp = easeOutCubic(interpolate(frame, [introStart, introStart + introDurF], [0, 1], {
@@ -874,6 +893,12 @@ export const KubicleAIChat: React.FC<KubicleAIChatProps> = ({
   // Section start frames
   const sectionStarts = response.sections.map((_, i) => sectionBase + i * SEC_STAGGER);
 
+  // The user bubble grows to fit the prompt; start the AI response below it so
+  // a tall (multi-line) bubble never overlaps the answer. The 42px gap matches
+  // the original single-line spacing (88px bubble + 42 = the old +130 offset).
+  const userBubble  = estimateUserBubble(userPrompt);
+  const responseTop = BUBBLE_TOP + userBubble.h + 42;
+
   return (
     <AbsoluteFill style={{ background: PLATINUM_BG, overflow: 'hidden' }}>
       {/* Everything below moves as one unit: the entire chat scene slides up
@@ -912,7 +937,7 @@ export const KubicleAIChat: React.FC<KubicleAIChatProps> = ({
         />
 
         {/* AI typing pulse (between morph and response) */}
-        <AITypingPulse frame={frame} startF={typingStart} opacity={typingOp} />
+        <AITypingPulse frame={frame} startF={typingStart} opacity={typingOp} top={responseTop} />
 
         {/* AI response (intro + sections) */}
         {frame >= introStart - 4 && (
@@ -924,6 +949,7 @@ export const KubicleAIChat: React.FC<KubicleAIChatProps> = ({
             sectionStartFrames={sectionStarts}
             sectionDurF={SEC_DUR}
             introDurF={INTRO_DUR}
+            responseTop={responseTop}
           />
         )}
       </div>
