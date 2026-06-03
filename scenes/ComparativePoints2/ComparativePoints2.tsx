@@ -314,7 +314,9 @@ function SideFrame({
         />
       </div>
 
-      {/* Pill text — flex-centred wrapper sized to the pill's bbox */}
+      {/* Pill text — flex-centred wrapper sized to the pill's bbox. The wrapper
+          clips so a too-long label can never spill past the pill onto the
+          background; the span is capped at 100% width and ellipsis-truncated. */}
       <div
         style={{
           position: 'absolute',
@@ -325,6 +327,7 @@ function SideFrame({
           display: 'flex',
           alignItems:     'center',
           justifyContent: 'center',
+          overflow: 'hidden',
           opacity: textOp,
           pointerEvents: 'none',
         }}
@@ -339,6 +342,9 @@ function SideFrame({
             letterSpacing: '-0.005em',
             whiteSpace: 'nowrap',
             display: 'inline-block',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
             transform: 'translateY(-8px)',
           }}
         >
