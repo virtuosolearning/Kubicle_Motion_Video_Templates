@@ -45,9 +45,10 @@ export const checklist5PillsTimingsSchema = z
   .partial();
 
 export const checklist5PillsSchema = z.object({
-  // Exactly 5 responsibility lines, ordered top → bottom. Bold white at 37 px
-  // inside the dark pill, ≤30 chars to fit comfortably.
-  responsibilities: z.array(z.string().min(1).max(30)).length(5),
+  // 1 to 6 responsibility lines, ordered top → bottom. The pill band auto-
+  // centres vertically for the count. Bold white at 37 px inside the pill,
+  // ≤30 chars (clipped to the pill if longer, so keep it short).
+  responsibilities: z.array(z.string().min(1).max(30)).min(1).max(6),
   // Hero icon ID (e.g. "strategy"). Resolved to icons/<id>.svg.
   hero: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
@@ -66,13 +67,16 @@ export const checklist5PillsMeta = {
     'content that should read as items being ticked off — responsibilities, ' +
     'ownership lists, must-haves, compliance items, completed deliverables.',
   authoringNotes:
-    'Always supply exactly 5 responsibilities. Each is bold white at 37 px ' +
-    'inside a dark pill — strict 30-char max, single line. Aim for parallel ' +
-    'imperative phrasing. GOOD: "Define project scope", "Lead daily stand-ups". ' +
-    'BAD: "It\'s your responsibility to define project scope" (too long). ' +
+    'Supply 1 to 6 responsibilities — the pill band auto-centres vertically for ' +
+    'the count (3 pills sit centred in the frame, etc.). Each is bold white at ' +
+    '37 px inside a pill — 30-char max, single line, clipped to the pill so it ' +
+    'never spills onto the background (keep it short / summarised). Aim for ' +
+    'parallel imperative phrasing. GOOD: "Define project scope", "Lead daily ' +
+    'stand-ups". BAD: "It\'s your responsibility to define project scope" (too long). ' +
     "hero is a discriminated union: { kind: 'icon', id } renders icons/<id>.svg " +
     "(520×520 line art on the left); { kind: 'character', id } renders " +
-    'characters/<id>.png at 600×880 bottom-anchored. Default duration 360 frames (12 s).',
+    'characters/<id>.png centred and scaled up to fill a dodger-blue gradient ' +
+    'rounded panel on the left, matched to the 5-pill height. Default duration 360 frames (12 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -93,26 +97,41 @@ const PILL_TOP   = 217;
 const CIRCLE_CX = 906;
 const CIRCLE_R  = 45;
 
-// Row layout — 5 rows, 142 px apart.
-const FIRST_PILL_TOP = 200;
-const ROW_PITCH      = 142;
-const rowOffsetY = (n: number) => (FIRST_PILL_TOP + n * ROW_PITCH) - PILL_TOP;
+// Row layout — pills are ROW_PITCH apart; the band of `count` pills (1-6)
+// auto-centres vertically on the canvas. PILL_HEIGHT is the pill's alpha-bbox
+// height in pill_base.png (215..329 = 114).
+const ROW_PITCH   = 142;
+const PILL_HEIGHT = 114;
+const CANVAS_CY   = 540;
+// Top edge fed to the pill_base translate so the band is vertically centred for
+// any count. (+2 reconciles PILL_TOP 217 vs the pill's actual alpha top 215.)
+const firstPillTopFor = (count: number) =>
+  CANVAS_CY - ((count - 1) * ROW_PITCH + PILL_HEIGHT) / 2 + (PILL_TOP - 215);
+const rowOffsetY = (n: number, firstPillTop: number) =>
+  (firstPillTop + n * ROW_PITCH) - PILL_TOP;
 
 // Hero icon (left).
 const HERO_SIZE = 520;
 const HERO_CX   = 425;
 const HERO_CY   = 540;
 
-// Character bbox — larger than the icon so the presenter has card-height
-// presence on the no-panel platinum-blue background. Bottom-anchored.
-const CHAR_WIDTH  = 600;
-const CHAR_HEIGHT = 880;
-const CHAR_LEFT   = HERO_CX - CHAR_WIDTH / 2;   // 125
-const CHAR_TOP    = 100;
+// Character hero — a dodger-blue gradient rounded rectangle on the left, a FIXED
+// size centred vertically in the frame (does NOT follow the pill count), with
+// the character centred horizontally and scaled up to FILL the panel
+// (object-fit: cover), clipped to the rounded rect.
+const CHAR_PANEL_W      = 560;
+const CHAR_PANEL_HEIGHT = 682;
+const CHAR_PANEL_TOP    = (1080 - CHAR_PANEL_HEIGHT) / 2;      // 199 — centred
+const CHAR_PANEL_LEFT   = HERO_CX - CHAR_PANEL_W / 2;          // 145
+const CHAR_PANEL_RADIUS = 44;
+const CHAR_PANEL_GRADIENT =
+  'linear-gradient(160deg, #2AACFF 0%, #0496FF 55%, #0A78D0 100%)';
 
-// Responsibility text.
+// Responsibility text. Width-capped so it stays INSIDE the pill (clipped with an
+// ellipsis rather than spilling past the rounded end) — keeps text contained.
 const TEXT_LEFT = 985;
 const TEXT_CY   = 273;
+const TEXT_MAX_WIDTH = PILL_RIGHT - TEXT_LEFT - 56;   // 697
 
 // Tick.png tick region.
 const TICK_LEFT  = 884;
@@ -164,6 +183,7 @@ function loadFonts(): Promise<void> {
 
 function PillRow({
   index,
+  firstPillTop,
   frame,
   text,
   pillFadeStart,
@@ -175,6 +195,7 @@ function PillRow({
   textFadeDur,
 }: {
   index: number;
+  firstPillTop: number;
   frame: number;
   text: string;
   pillFadeStart: number;
@@ -185,7 +206,7 @@ function PillRow({
   tickStartOffset: number;
   textFadeDur: number;
 }) {
-  const oy = rowOffsetY(index);
+  const oy = rowOffsetY(index, firstPillTop);
 
   // Phase 2 — pill fade-up from below.
   const fadeUpProg = interpolate(frame, [pillFadeStart, pillFadeStart + pillFadeDur], [0, 1], {
@@ -296,7 +317,11 @@ function PillRow({
           color: '#FFFFFF',
           letterSpacing: '-0.01em',
           whiteSpace: 'nowrap',
+          // Capped to the pill width and clipped with an ellipsis so a long line
+          // never spills past the pill onto the background.
+          maxWidth: TEXT_MAX_WIDTH,
           overflow: 'hidden',
+          textOverflow: 'ellipsis',
           opacity: textOp,
           pointerEvents: 'none',
         }}
@@ -342,6 +367,9 @@ export const Checklist5Pills: React.FC<Checklist5PillsProps> = ({
     extrapolateRight: 'clamp',
   });
 
+  // Vertically centre the pill band for however many pills (1-6) were supplied.
+  const firstPillTop = firstPillTopFor(responsibilities.length);
+
   return (
     <AbsoluteFill style={{ background: '#E6ECF2', overflow: 'hidden' }}>
       {/* Phase 1 — hero fades in (icon OR character) */}
@@ -367,10 +395,13 @@ export const Checklist5Pills: React.FC<Checklist5PillsProps> = ({
         <div
           style={{
             position: 'absolute',
-            left: CHAR_LEFT,
-            top:  CHAR_TOP,
-            width:  CHAR_WIDTH,
-            height: CHAR_HEIGHT,
+            left: CHAR_PANEL_LEFT,
+            top:  CHAR_PANEL_TOP,
+            width:  CHAR_PANEL_W,
+            height: CHAR_PANEL_HEIGHT,
+            borderRadius: CHAR_PANEL_RADIUS,
+            background: CHAR_PANEL_GRADIENT,
+            overflow: 'hidden',
             opacity: heroOpacity,
             pointerEvents: 'none',
           }}
@@ -379,23 +410,30 @@ export const Checklist5Pills: React.FC<Checklist5PillsProps> = ({
             src={staticFile(`characters/${hero.id}.png`)}
             alt=""
             style={{
+              // Centred horizontally and scaled up to fill the dodger panel;
+              // object-position favours the head, clipped to the rounded rect.
               width: '100%',
               height: '100%',
-              objectFit: 'contain',
-              objectPosition: '50% 100%',
+              objectFit: 'cover',
+              objectPosition: '50% 18%',
               display: 'block',
+              // Drop shadow lifts the figure off the dodger-blue gradient.
+              filter:
+                'drop-shadow(0 16px 22px rgba(2, 18, 36, 0.40)) ' +
+                'drop-shadow(0 4px 8px rgba(2, 18, 36, 0.30))',
             }}
           />
         </div>
       )}
 
-      {/* Phases 2 + 3 — 5 pill rows */}
-      {[0, 1, 2, 3, 4].map(i => (
+      {/* Phases 2 + 3 — one pill row per responsibility (1-6) */}
+      {responsibilities.map((text, i) => (
         <PillRow
           key={i}
           index={i}
+          firstPillTop={firstPillTop}
           frame={frame}
-          text={responsibilities[i]!}
+          text={text}
           pillFadeStart={PILL_FADE_BASE + i * PILL_FADE_STAGGER}
           pillFadeDur={PILL_FADE_DUR}
           rowStart={ROW_BASE + i * ROW_SPACING}
