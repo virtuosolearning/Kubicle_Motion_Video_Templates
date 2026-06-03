@@ -39,6 +39,9 @@ import { z } from 'zod';
 const milestoneSchema = z.object({
   title:       z.string().min(1).max(20),
   description: z.string().min(1).max(32),
+  // Small-Icons id — resolves to small-icons/<id>.svg. The SVGs in that
+  // folder are pre-coloured white so they read on the dodger-blue square.
+  icon:        z.string().min(1),
 });
 
 const characterAnchorSchema = z.object({
@@ -60,7 +63,7 @@ export const fivePoints1SubtopicV2CharacterTimingsSchema = z
     cardInDuration: z.number().positive(),
     spineDrawStart: z.number().nonnegative(),
     spineDrawEnd:   z.number().positive(),
-    peaks:          z.array(z.number().nonnegative()).length(5),
+    peaks:          z.array(z.number().nonnegative()).min(1).max(5),
     transitDuration: z.number().positive(),
     spotlightEnter: z.number().nonnegative(),
     spotlightExit:  z.number().positive(),
@@ -69,7 +72,9 @@ export const fivePoints1SubtopicV2CharacterTimingsSchema = z
   .partial();
 
 export const fivePoints1SubtopicV2CharacterSchema = z.object({
-  milestones: z.array(milestoneSchema).length(5),
+  // 1 to 5 milestones — the spine + card band auto-centre vertically for
+  // the count (3 milestones sit centred in the frame, etc.).
+  milestones: z.array(milestoneSchema).min(1).max(5),
   character:  characterAnchorSchema,
   timings:    fivePoints1SubtopicV2CharacterTimingsSchema.optional(),
 });
@@ -86,11 +91,17 @@ export const fivePoints1SubtopicV2CharacterMeta = {
     'lighting each tick and lifting the active card. Same animation as ' +
     'FivePoints1SubtopicV2; only the panel anchor differs.',
   authoringNotes:
-    'Always supply exactly 5 milestones. character.id is a PNG in ' +
-    'characters/<id>.png. characterHeight controls the rendered px height; ' +
-    'characterY positions the image from the top of the panel content area. ' +
-    'Tune both so the face lands at the panel centre (~475 px from the box ' +
-    'top) and nothing is clipped. Default duration 450 frames (15 s).',
+    'Supply 1 to 5 milestones — the spine + card band auto-centre ' +
+    'vertically for the count (3 milestones sit centred in the frame, ' +
+    'etc.). Each milestone has { title, description, icon }; icon is an ' +
+    'id from the Small-Icons/ folder (e.g. "search (1)", "layer-plus", ' +
+    '"arrow-trend-up") — those SVGs are pre-coloured white and render on ' +
+    'a dodger-blue square that masks the baked arrow inside each pill. ' +
+    'character.id is a PNG in characters/<id>.png. characterHeight ' +
+    'controls the rendered px height; characterY positions the image ' +
+    'from the top of the panel content area. Tune both so the face lands ' +
+    'at the panel centre (~475 px from the box top) and nothing is ' +
+    'clipped. Default duration 450 frames (15 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -111,18 +122,20 @@ const PILL_SRC_TOP  = 76;
 const CARD_W = 755;
 const CARD_H = 158;
 
-const CARD_CYS = [139, 340, 540, 740, 940] as const;
+// Vertical layout for 1-5 cards. The 5-card pitch (200 px) is preserved
+// from the prototype; for fewer cards the band centres on the canvas.
+const CANVAS_CY  = 540;
+const CARD_PITCH = 200;
+const cardCyFor  = (count: number, i: number) =>
+  CANVAS_CY - ((count - 1) * CARD_PITCH) / 2 + i * CARD_PITCH;
+const tickCyFor  = (count: number, i: number) => cardCyFor(count, i);
+const spineTopFor    = (count: number) => tickCyFor(count, 0);
+const spineBottomFor = (count: number) => tickCyFor(count, count - 1);
 
 const TICK_SRC_CX = 995;
 const TICK_SRC_CY = 141;
 const TICK_GLYPH_LEFT  = 981;
 const TICK_GLYPH_RIGHT = 1008;
-
-const TICK_CYS = [141, 339, 540, 740, 941] as const;
-
-const SPINE_TOP_Y    = 136;
-const SPINE_BOTTOM_Y = 940;
-const SPINE_HEIGHT   = SPINE_BOTTOM_Y - SPINE_TOP_Y;
 
 // Dodger-Blue panel (replaces the Oxford-Blue artwork from V2).
 // Bounds match the visible panel in the original icon_base.png so the
@@ -145,6 +158,19 @@ const CARD_TEXT_LEFT   = 154;
 const CARD_TITLE_TOP   = 30;
 const CARD_DESC_TOP    = 86;
 const CARD_TEXT_RIGHT_PAD = 24;
+
+// Per-card icon overlay: a dodger-blue rounded square that masks the
+// baked arrow in pill_base.png plus a Small-Icons SVG centred on top.
+// Baked-square true alpha bbox in pill_base.png: x=1094..1190, y=110..199
+// (radius ~17). Overlay extends 2 px past every edge so no rim peeks through.
+const ICON_BOX_LEFT   = 27;     // 1094 - 1065 - 2
+const ICON_BOX_TOP    = 33;     // 110  - 76   - 1
+const ICON_BOX_WIDTH  = 100;
+const ICON_BOX_HEIGHT = 92;
+const ICON_BOX_RADIUS = 18;
+const ICON_GLYPH_SIZE = 50;
+const ICON_BOX_GRADIENT =
+  'linear-gradient(180deg, #1FA3FF 0%, #0496FF 100%)';
 
 const FOCUS_NEAR = 20;
 const FOCUS_FAR  = 210;
@@ -190,27 +216,29 @@ function spotlightY(
   fadeDur: number,
   peaks: number[],
   transit: number,
+  cardCYs: readonly number[],
 ): number {
+  const last = cardCYs.length - 1;
   if (frame < enter) return -300;
   if (frame < peaks[0]!) {
     const p = clamp01((frame - enter) / (peaks[0]! - enter));
-    return -300 + (CARD_CYS[0] - (-300)) * easeInOutQuint(p);
+    return -300 + (cardCYs[0]! - (-300)) * easeInOutQuint(p);
   }
-  for (let i = 0; i < peaks.length - 1; i++) {
+  for (let i = 0; i < peaks.length - 1 && i < last; i++) {
     if (frame < peaks[i + 1]!) {
       const dwellEnd = peaks[i + 1]! - transit;
-      if (frame < dwellEnd) return CARD_CYS[i]!;
+      if (frame < dwellEnd) return cardCYs[i]!;
       const p = clamp01((frame - dwellEnd) / transit);
-      return CARD_CYS[i]! + (CARD_CYS[i + 1]! - CARD_CYS[i]!) * easeInOutQuint(p);
+      return cardCYs[i]! + (cardCYs[i + 1]! - cardCYs[i]!) * easeInOutQuint(p);
     }
   }
-  if (frame < exit) return CARD_CYS[4]!;
+  if (frame < exit) return cardCYs[last]!;
   const p = clamp01((frame - exit) / fadeDur);
-  return CARD_CYS[4]! + 400 * easeInOutQuint(p);
+  return cardCYs[last]! + 400 * easeInOutQuint(p);
 }
 
-function cardFocus(idx: number, sy: number): number {
-  const dist = Math.abs(sy - CARD_CYS[idx]!);
+function cardFocus(idx: number, sy: number, cardCYs: readonly number[]): number {
+  const dist = Math.abs(sy - cardCYs[idx]!);
   if (dist <= FOCUS_NEAR) return 1;
   if (dist >= FOCUS_FAR)  return 0;
   return smoothstep(1 - (dist - FOCUS_NEAR) / (FOCUS_FAR - FOCUS_NEAR));
@@ -240,23 +268,30 @@ function Spine({
   sy,
   spineDrawStart,
   spineDrawEnd,
+  spineTop,
+  spineBottom,
 }: {
   frame: number;
   sy: number;
   spineDrawStart: number;
   spineDrawEnd: number;
+  spineTop: number;
+  spineBottom: number;
 }) {
+  const spineHeight = spineBottom - spineTop;
+  if (spineHeight <= 0) return null;
+
   const drawProg = interpolate(frame, [spineDrawStart, spineDrawEnd], [0, 1], {
     extrapolateLeft:  'clamp',
     extrapolateRight: 'clamp',
     easing: easeInOutCubic,
   });
-  const drawHeight  = SPINE_HEIGHT * drawProg;
-  const drawClipBot = 1080 - (SPINE_TOP_Y + drawHeight);
+  const drawHeight  = spineHeight * drawProg;
+  const drawClipBot = 1080 - (spineTop + drawHeight);
 
-  const blueProg   = clamp01((sy - SPINE_TOP_Y) / SPINE_HEIGHT);
-  const blueHeight = SPINE_HEIGHT * blueProg;
-  const blueClipBot = 1080 - (SPINE_TOP_Y + blueHeight);
+  const blueProg   = clamp01((sy - spineTop) / spineHeight);
+  const blueHeight = spineHeight * blueProg;
+  const blueClipBot = 1080 - (spineTop + blueHeight);
 
   return (
     <>
@@ -264,7 +299,7 @@ function Spine({
         style={{
           position: 'absolute',
           inset: 0,
-          clipPath: `inset(${SPINE_TOP_Y}px 0 ${drawClipBot}px 0)`,
+          clipPath: `inset(${spineTop}px 0 ${drawClipBot}px 0)`,
           pointerEvents: 'none',
         }}
       >
@@ -274,7 +309,7 @@ function Spine({
         style={{
           position: 'absolute',
           inset: 0,
-          clipPath: `inset(${SPINE_TOP_Y}px 0 ${blueClipBot}px 0)`,
+          clipPath: `inset(${spineTop}px 0 ${blueClipBot}px 0)`,
           pointerEvents: 'none',
         }}
       >
@@ -287,15 +322,15 @@ function Spine({
 // ─── Milestone ────────────────────────────────────────────────────────────────
 
 function Milestone({
-  index,
+  tickCy,
   frame,
   peakFrame,
 }: {
-  index: number;
+  tickCy: number;
   frame: number;
   peakFrame: number;
 }) {
-  const offset = TICK_CYS[index]! - TICK_SRC_CY;
+  const offset = tickCy - TICK_SRC_CY;
 
   const circleStart = peakFrame - f(0.65);
   const circleEnd   = peakFrame;
@@ -348,16 +383,22 @@ function Card({
   index,
   frame,
   sy,
+  cy,
+  cardCYs,
   title,
   description,
+  icon,
   cardInStagger,
   cardInDur,
 }: {
   index: number;
   frame: number;
   sy: number;
+  cy: number;
+  cardCYs: readonly number[];
   title: string;
   description: string;
+  icon: string;
   cardInStagger: number;
   cardInDur: number;
 }) {
@@ -366,7 +407,7 @@ function Card({
   const baseScale   = inProg > 0 ? easeInOutCubic(inProg) : 0;
   const baseOpacity = 0.70 * easeInOutCubic(inProg);
 
-  const focus        = cardFocus(index, sy);
+  const focus        = cardFocus(index, sy, cardCYs);
   const focusScale   = 1 + 0.05 * focus;
   const focusOpacity = 0.70 + 0.30 * focus;
 
@@ -374,7 +415,6 @@ function Card({
   const drawScale   = settled ? focusScale : baseScale;
   const drawOpacity = settled ? focusOpacity : baseOpacity;
 
-  const cy   = CARD_CYS[index]!;
   const left = PILL_SRC_LEFT;
   const top  = cy - CARD_H / 2;
 
@@ -404,6 +444,29 @@ function Card({
             height: 1080,
             display: 'block',
           }}
+        />
+      </div>
+
+      {/* Dodger-blue square that masks the baked arrow; user-chosen Small-Icon
+          glyph renders centred on top. */}
+      <div
+        style={{
+          position: 'absolute',
+          left:   ICON_BOX_LEFT,
+          top:    ICON_BOX_TOP,
+          width:  ICON_BOX_WIDTH,
+          height: ICON_BOX_HEIGHT,
+          borderRadius: ICON_BOX_RADIUS,
+          background:   ICON_BOX_GRADIENT,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Img
+          src={staticFile(`small-icons/${icon}.svg`)}
+          alt=""
+          style={{ width: ICON_GLYPH_SIZE, height: ICON_GLYPH_SIZE, display: 'block' }}
         />
       </div>
 
@@ -529,7 +592,13 @@ export const FivePoints1SubtopicV2Character: React.FC<
   const SPOT_EXIT        = f(t.spotlightExit);
   const SPOT_FADE        = f(t.spotlightFade);
 
-  const sy = spotlightY(frame, SPOT_ENTER, SPOT_EXIT, SPOT_FADE, PEAKS, TRANSIT);
+  const count = milestones.length;
+  const cardCYs = Array.from({ length: count }, (_, i) => cardCyFor(count, i));
+  const tickCYs = Array.from({ length: count }, (_, i) => tickCyFor(count, i));
+  const spineTop    = spineTopFor(count);
+  const spineBottom = spineBottomFor(count);
+
+  const sy = spotlightY(frame, SPOT_ENTER, SPOT_EXIT, SPOT_FADE, PEAKS, TRANSIT, cardCYs);
 
   const panelOp = interpolate(frame, [PANEL_FADE_START, PANEL_FADE_END], [0, 1], {
     extrapolateLeft:  'clamp',
@@ -550,23 +619,38 @@ export const FivePoints1SubtopicV2Character: React.FC<
         />
       </div>
 
-      <Spine frame={frame} sy={sy} spineDrawStart={SPINE_DRAW_START} spineDrawEnd={SPINE_DRAW_END} />
+      <Spine
+        frame={frame}
+        sy={sy}
+        spineDrawStart={SPINE_DRAW_START}
+        spineDrawEnd={SPINE_DRAW_END}
+        spineTop={spineTop}
+        spineBottom={spineBottom}
+      />
 
-      {[0, 1, 2, 3, 4].map(i => (
+      {milestones.map((m, i) => (
         <Card
           key={`c${i}`}
           index={i}
           frame={frame}
           sy={sy}
-          title={milestones[i]!.title}
-          description={milestones[i]!.description}
+          cy={cardCYs[i]!}
+          cardCYs={cardCYs}
+          title={m.title}
+          description={m.description}
+          icon={m.icon}
           cardInStagger={CARD_IN_STAGGER}
           cardInDur={CARD_IN_DUR}
         />
       ))}
 
-      {[0, 1, 2, 3, 4].map(i => (
-        <Milestone key={`m${i}`} index={i} frame={frame} peakFrame={PEAKS[i]!} />
+      {milestones.map((_, i) => (
+        <Milestone
+          key={`m${i}`}
+          tickCy={tickCYs[i]!}
+          frame={frame}
+          peakFrame={PEAKS[Math.min(i, PEAKS.length - 1)]!}
+        />
       ))}
     </AbsoluteFill>
   );
@@ -576,11 +660,11 @@ export const FivePoints1SubtopicV2Character: React.FC<
 
 export const fivePoints1SubtopicV2CharacterDefaultProps: FivePoints1SubtopicV2CharacterProps = {
   milestones: [
-    { title: 'Discovery', description: 'Research user needs' },
-    { title: 'Plan',      description: 'Map scope and risks' },
-    { title: 'Build',     description: 'Ship the first cut' },
-    { title: 'Review',    description: 'Test with real users' },
-    { title: 'Launch',    description: 'Roll out and measure' },
+    { title: 'Discovery', description: 'Research user needs',   icon: 'search (1)' },
+    { title: 'Plan',      description: 'Map scope and risks',   icon: 'map-marker-plus' },
+    { title: 'Build',     description: 'Ship the first cut',    icon: 'layer-plus' },
+    { title: 'Review',    description: 'Test with real users',  icon: 'ai-assistant' },
+    { title: 'Launch',    description: 'Roll out and measure',  icon: 'arrow-trend-up' },
   ],
   character: {
     id: 'presenter-red',
