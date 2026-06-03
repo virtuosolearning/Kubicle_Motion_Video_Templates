@@ -33,6 +33,8 @@ import { z } from 'zod';
 export const flywheel4PetalsPetalSchema = z.object({
   label: z.string().min(1).max(14),
   body:  z.string().min(1).max(48),
+  // Small-Icons id — resolves to small-icons/<id>.svg. Those SVGs are
+  // pre-coloured white so they read on the dodger-blue petal.
   icon:  z.string().min(1),
 });
 
@@ -57,8 +59,14 @@ export const flywheel4PetalsTimingsSchema = z
 export const flywheel4PetalsSchema = z.object({
   title:       z.string().min(1).max(28),   // central hub headline
   subtitle:    z.string().min(1).max(40),   // small line under the title in the hub
+  // Master Icons/ id — resolves to icons/<id>.svg. Use a -dark-suffix icon
+  // from the catalogue: those are platinum + dodger-blue line art and read
+  // brightly on the oxford-blue → black hub.
   centerIcon:  z.string().min(1),
-  petals:      z.array(flywheel4PetalsPetalSchema).length(4),  // clockwise: top, right, bottom, left
+  // 2 to 4 petals, clockwise from the top. The wheel auto-divides 360° by
+  // the count; 4 → top/right/bottom/left, 3 → top/lower-right/lower-left,
+  // 2 → top/bottom semicircles.
+  petals:      z.array(flywheel4PetalsPetalSchema).min(2).max(4),
   timings:     flywheel4PetalsTimingsSchema.optional(),
 });
 
@@ -74,13 +82,18 @@ export const flywheel4PetalsMeta = {
   authoringNotes:
     'title is the headline inside the central hub (≤28 chars, Satoshi Bold, ' +
     'dark oxford). subtitle is a short supporting line below it (≤40 chars). ' +
-    'centerIcon is drawn beneath the title in the hub. petals is exactly 4 ' +
-    'entries in clockwise order starting from the top: [top, right, bottom, ' +
-    'left]. Each petal carries a label (≤14 chars, short phase name) and a ' +
-    'body (≤48 chars, single supporting line). icon is the lucide-style SVG ' +
-    'id shown inside the petal. GOOD label: "Plan", "Act", "Observe", ' +
-    '"Reflect". BAD label: "Planning phase activities" (too long — strip to ' +
-    'the verb or noun core). Default duration 300 frames (10 s).',
+    'centerIcon is drawn beneath the title in the hub — use a -dark-suffix ' +
+    'icon from the master Icons/ catalogue (those are platinum + dodger-blue ' +
+    'line art and stand out against the oxford-blue → black hub). petals is ' +
+    '2 to 4 entries in clockwise order starting from the top: 4 → ' +
+    '[top, right, bottom, left], 3 → [top, lower-right, lower-left], 2 → ' +
+    '[top, bottom]. Each petal carries a label (≤14 chars, short phase ' +
+    'name), a body (≤48 chars, single supporting line), and an icon — a ' +
+    'Small-Icons id (those SVGs are pre-coloured white and read on the ' +
+    'dodger-blue petal). GOOD label: "Plan", "Act", "Observe", "Reflect". ' +
+    'BAD label: "Planning phase activities" (too long — strip to the verb ' +
+    'or noun core). Long labels/bodies are clipped to the petal interior, ' +
+    'never spill onto the background. Default duration 300 frames (10 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -232,16 +245,19 @@ function petalPath(startDeg: number, endDeg: number, innerR: number, outerR: num
   ].join(' ');
 }
 
-// Petal i (0-indexed clockwise from top). Returns [startDeg, endDeg] in math angles.
-// Petal 0 (top): 135° → 45°
-// Petal 1 (right): 45° → -45°
-// Petal 2 (bottom): -45° → -135°
-// Petal 3 (left): -135° → -225° (or equivalently 225° → 135°)
-function petalAngles(i: number): { startDeg: number; endDeg: number; midDeg: number } {
-  // Petal midpoints (clockwise: top, right, bottom, left).
-  const midAngles = [90, 0, -90, 180] as const;
-  const mid = midAngles[i]!;
-  const halfWidth = 45 - GAP_DEG / 2;  // 45° petal half-width, minus half the gap
+// Petal i of `count` (0-indexed clockwise from top). The wheel is divided
+// evenly into `count` slices of (360 / count)°. Petal 0 sits at the top
+// (mid = 90°) and each subsequent petal steps clockwise.
+//   count=4 → mids [90, 0, -90, 180]
+//   count=3 → mids [90, -30, -150]
+//   count=2 → mids [90, -90]  (top + bottom semicircles)
+function petalAngles(
+  i: number,
+  count: number,
+): { startDeg: number; endDeg: number; midDeg: number } {
+  const sweep    = 360 / count;
+  const mid      = 90 - i * sweep;            // clockwise from top
+  const halfWidth = sweep / 2 - GAP_DEG / 2;
   return {
     startDeg: mid + halfWidth,
     endDeg:   mid - halfWidth,
@@ -249,17 +265,24 @@ function petalAngles(i: number): { startDeg: number; endDeg: number; midDeg: num
   };
 }
 
+// Pick a petal gradient spread evenly across the 4-stop palette so 2 / 3 /
+// 4 petals always span lightest → deepest without re-using the same shade.
+function petalGradient(i: number, count: number): readonly [string, string] {
+  const idx = count === 1 ? 0 : Math.round((i * (PETAL_GRADIENTS.length - 1)) / (count - 1));
+  return PETAL_GRADIENTS[idx]!;
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function Petal({
-  i, frame, startF, durF, highlightStartF, highlightDurF,
+  i, count, frame, startF, durF, highlightStartF, highlightDurF,
 }: {
-  i: number; frame: number; startF: number; durF: number;
+  i: number; count: number; frame: number; startF: number; durF: number;
   highlightStartF: number; highlightDurF: number;
 }) {
-  const { startDeg, endDeg, midDeg } = petalAngles(i);
+  const { startDeg, endDeg, midDeg } = petalAngles(i, count);
   const path = petalPath(startDeg, endDeg, INNER_R, OUTER_R);
-  const [outerColor, innerColor] = PETAL_GRADIENTS[i]!;
+  const [outerColor, innerColor] = petalGradient(i, count);
 
   const local = frame - startF;
   const op = interpolate(local, [0, durF * 0.7], [0, 1], {
@@ -436,9 +459,10 @@ function Hub({
 }
 
 function PetalContent({
-  i, petal, frame, startF, contentStaggerF, contentDurF,
+  i, count, petal, frame, startF, contentStaggerF, contentDurF,
 }: {
   i: number;
+  count: number;
   petal: Flywheel4PetalsProps['petals'][number];
   frame: number;
   startF: number;
@@ -448,7 +472,7 @@ function PetalContent({
   const local = frame - startF;
   if (local < 0) return null;
 
-  const { midDeg } = petalAngles(i);
+  const { midDeg } = petalAngles(i, count);
   // Petal content centroid — same radius for every petal at its midpoint
   // angle. All items stack VERTICALLY around this point so left/right
   // petals don't try to cram items along a horizontal axis.
@@ -533,13 +557,14 @@ function PetalContent({
         }}
       >
         <Img
-          src={staticFile(`icons/${petal.icon}.svg`)}
+          src={staticFile(`small-icons/${petal.icon}.svg`)}
           alt=""
           style={{ width: '100%', height: '100%', display: 'block' }}
         />
       </div>
 
-      {/* Label */}
+      {/* Label — single line by design; long text wraps to 2 lines and
+          anything past that is clipped so it never spills onto the bg. */}
       <div
         style={{
           position: 'absolute',
@@ -551,18 +576,22 @@ function PetalContent({
           fontWeight: 700,
           fontSize: 28,
           letterSpacing: '-0.012em',
-          lineHeight: 1,
-          maxWidth: labelMaxWidth,
+          lineHeight: 1.05,
+          width: labelMaxWidth,
+          maxHeight: 28 * 1.05 * 2,
           textAlign: 'center',
           opacity: labelOp,
           textShadow: '0 1px 4px rgba(0,40,80,0.30)',
-          whiteSpace: 'nowrap',
+          overflowWrap: 'break-word',
+          wordBreak: 'break-word',
+          overflow: 'hidden',
         }}
       >
         {petal.label}
       </div>
 
-      {/* Body */}
+      {/* Body — wraps inside the petal; ≥3 lines is clipped so a runaway
+          description can't spill onto the background. */}
       <div
         style={{
           position: 'absolute',
@@ -575,9 +604,13 @@ function PetalContent({
           fontSize: 17,
           letterSpacing: '-0.003em',
           lineHeight: 1.30,
-          maxWidth: bodyMaxWidth,
+          width: bodyMaxWidth,
+          maxHeight: 17 * 1.30 * 3,
           textAlign: 'center',
           opacity: bodyOp,
+          overflowWrap: 'break-word',
+          wordBreak: 'break-word',
+          overflow: 'hidden',
         }}
       >
         {petal.body}
@@ -618,6 +651,8 @@ export const Flywheel4Petals: React.FC<Flywheel4PetalsProps> = ({
   const HIGHLIGHT_GAP     = f(t.highlightGap);
   const HIGHLIGHT_STEP    = HIGHLIGHT_DUR + HIGHLIGHT_GAP;
 
+  const count = petals.length;
+
   return (
     <AbsoluteFill style={{ background: BG_COLOR, overflow: 'hidden' }}>
       {/* SVG wheel — petals and gradients */}
@@ -627,10 +662,11 @@ export const Flywheel4Petals: React.FC<Flywheel4PetalsProps> = ({
         viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
         style={{ position: 'absolute', inset: 0 }}
       >
-        {[0, 1, 2, 3].map(i => (
+        {petals.map((_, i) => (
           <Petal
             key={`petal-${i}`}
             i={i}
+            count={count}
             frame={frame}
             startF={PETAL_START + i * PETAL_STAGGER}
             durF={PETAL_DUR}
@@ -645,6 +681,7 @@ export const Flywheel4Petals: React.FC<Flywheel4PetalsProps> = ({
         <PetalContent
           key={`pc-${i}`}
           i={i}
+          count={count}
           petal={petal}
           frame={frame}
           startF={PETAL_START + i * PETAL_STAGGER + CONTENT_OFFSET}
