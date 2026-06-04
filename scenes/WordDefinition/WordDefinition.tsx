@@ -41,16 +41,11 @@ export const wordDefinitionTimingsSchema = z
   .partial();
 
 export const wordDefinitionSchema = z.object({
-  // The word being defined (e.g. "Serendipity"). Inter ExtraBold 74 px.
+  // The word being defined (e.g. "Serendipity"). Inter ExtraBold 74 px,
+  // ALWAYS near-black ink (locked to the brand palette).
   title: z.string().min(1).max(40),
-  // The definition text. Satoshi Medium 55.5 px, wraps.
+  // The definition text. Satoshi Medium 55.5 px, warm-grey, wraps.
   description: z.string().min(1).max(200),
-  // Title text colour. Defaults to #0B1B2B (near-black ink).
-  titleColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  // Description colour. Defaults to #4A5864 (warm grey).
-  descriptionColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  // Background tint hue (oklch). Defaults to 210 (cool platinum blue).
-  backgroundTintHue: z.number().min(0).max(360).optional(),
   timings: wordDefinitionTimingsSchema.optional(),
 });
 
@@ -62,12 +57,15 @@ export const wordDefinitionMeta = {
     'definition fades in below it, a banner drops from the top and an icon ' +
     'pill slides in from the right.',
   authoringNotes:
-    'title is the word being defined (Inter ExtraBold 74 px, near-black ink). ' +
-    'description is the definition text (Satoshi Medium 55.5 px, warm grey, ' +
-    'wraps to multiple lines). GOOD title: "Serendipity", "Ephemeral". GOOD ' +
-    'description: "The occurrence of events by chance in a happy way." Aim for ' +
-    'definitions under 120 chars so they fit 2–3 lines. Default duration ' +
-    '300 frames (10 s); hold time after animation completes is ~7 s.',
+    'Two editable fields: title (the word being defined; Inter ExtraBold 74 px, ' +
+    'near-black ink — colour locked) and description (Satoshi Medium 55.5 px, ' +
+    'warm-grey, wraps to multiple lines). The platinum-blue gradient ' +
+    'background, the title-text colour, and the description-text colour are ' +
+    'all LOCKED to the brand palette — no per-render overrides. GOOD title: ' +
+    '"Serendipity", "Ephemeral". GOOD description: "The occurrence of events ' +
+    'by chance in a happy way." Aim for definitions under 120 chars so they ' +
+    'fit 2–3 lines. Default duration 300 frames (10 s); hold time after ' +
+    'animation completes is ~7 s.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -93,10 +91,13 @@ const DESC_LINE_HEIGHT = 1.25;
 // Right-safe boundary so title/description don't run into the icon pill.
 const RIGHT_SAFE_X = 1320;
 
-// Default colours.
-const DEFAULT_TITLE_COLOUR = '#0B1B2B';
-const DEFAULT_DESC_COLOUR  = '#4A5864';
-const DEFAULT_HUE          = 210;
+// Brand-locked colours + background tint. NOT overridable per render.
+const TITLE_COLOUR       = '#0B1B2B';   // near-black ink
+const DESC_COLOUR        = '#4A5864';   // warm grey
+const BACKGROUND_HUE     = 210;          // cool platinum blue
+const BACKGROUND_GRADIENT =
+  `linear-gradient(135deg, oklch(97% 0.012 ${BACKGROUND_HUE}) 0%, ` +
+  `oklch(92% 0.022 ${BACKGROUND_HUE}) 100%)`;
 
 // Banner + pill entry distances.
 const BANNER_SLIDE_DISTANCE = 520;  // banner enters from top
@@ -310,9 +311,6 @@ function Description({
 export const WordDefinition: React.FC<WordDefinitionProps> = ({
   title,
   description,
-  titleColor,
-  descriptionColor,
-  backgroundTintHue,
   timings,
 }) => {
   const frame = useCurrentFrame();
@@ -333,21 +331,14 @@ export const WordDefinition: React.FC<WordDefinitionProps> = ({
   const DESC_START     = f(t.descFadeStart);
   const DESC_END       = f(t.descFadeEnd);
 
-  const hue = backgroundTintHue ?? DEFAULT_HUE;
-  const titleClr = titleColor ?? DEFAULT_TITLE_COLOUR;
-  const descClr  = descriptionColor ?? DEFAULT_DESC_COLOUR;
-
-  // Gradient background (the prototype's default style: cool platinum blue).
-  const bgGradient = `linear-gradient(135deg, oklch(97% 0.012 ${hue}) 0%, oklch(92% 0.022 ${hue}) 100%)`;
-
   return (
-    <AbsoluteFill style={{ background: bgGradient, overflow: 'hidden' }}>
+    <AbsoluteFill style={{ background: BACKGROUND_GRADIENT, overflow: 'hidden' }}>
       <Banner frame={frame} settleFrames={BANNER_SETTLE} />
       <IconPill frame={frame} settleFrames={PILL_SETTLE} />
       <TypewriterTitle
         frame={frame}
         text={title}
-        color={titleClr}
+        color={TITLE_COLOUR}
         startFrame={TITLE_START}
         endFrame={TITLE_END}
         letterFadeFrames={LETTER_FADE}
@@ -355,7 +346,7 @@ export const WordDefinition: React.FC<WordDefinitionProps> = ({
       <Description
         frame={frame}
         text={description}
-        color={descClr}
+        color={DESC_COLOUR}
         fadeStart={DESC_START}
         fadeEnd={DESC_END}
       />
