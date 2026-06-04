@@ -53,26 +53,38 @@ export const textThread2CharactersTimingsSchema = z
   })
   .partial();
 
-// Character config — PNG ID + optional zoom for cropping a full-body PNG
-// down to a waist-up framing inside the panel, + optional yOffset for
-// aligning head heights between characters with different PNG crops.
-const characterSchema = z.object({
-  id:   z.string().min(1),
-  // Default 1.0 = fit the PNG into the panel (cover, bottom-anchored). Values
-  // > 1 zoom in from the top so a full-body PNG crops to waist-up. Typical
-  // useful range 1.0–1.8.
-  zoom: z.number().min(0.5).max(2.5).optional(),
-  // Pixels to push the rendered character DOWN within its panel. Useful for
-  // matching head heights across two PNGs that have different amounts of
-  // headroom above the figure. Positive lowers, negative raises.
-  yOffset: z.number().optional(),
-});
+// Character library — every PNG in the shared CHARACTER LIBRARY (PNG) set.
+// They are uniformly-framed waist-up portraits, so the scene renders all of
+// them at one fixed framing (see FIXED_CHARACTER_ZOOM): pick any id and the
+// two characters always sit at the same size and position. Swapping a
+// character is just changing its id — no per-character tuning needed.
+export const CHARACTER_IDS = [
+  'Female_middleage_Asian',
+  'female_earlycareer_black',
+  'female_earlycareer_middleeastern',
+  'female_earlycareer_white',
+  'female_earlycareer_white2',
+  'female_earlycareer_white3',
+  'female_midcareer_white',
+  'female_middleage_white',
+  'female_middleage_white2',
+  'female_middleage_white3',
+  'male_earlycareer_black',
+  'male_middleage_asian',
+  'male_middleage_black',
+  'male_middleage_white',
+  'male_middleage_white2',
+  'male_middleage_white3',
+] as const;
+
+export const characterIdSchema = z.enum(CHARACTER_IDS);
 
 export const textThread2CharactersSchema = z.object({
   // Bold-black contact name in the phone's header.
   contactName:    z.string().min(1).max(22),
-  leftCharacter:  characterSchema,
-  rightCharacter: characterSchema,
+  // Pick any id from the character library — both render at identical framing.
+  leftCharacter:  characterIdSchema,
+  rightCharacter: characterIdSchema,
   // The text thread. Order matters — messages land in this order.
   messages:       z.array(textThread2CharactersMessageSchema).min(3).max(6),
   timings:        textThread2CharactersTimingsSchema.optional(),
@@ -94,9 +106,10 @@ export const textThread2CharactersMeta = {
     'side maps to which on-canvas character "sent" it AND to that bubble\'s ' +
     'colour: left ⇒ wild-strawberry received bubble, right ⇒ dodger-blue sent ' +
     'bubble. contactName ≤22 chars shows bold-black at the top of the phone. ' +
-    'leftCharacter / rightCharacter are PNG IDs in characters/<id>.png — ' +
-    'set zoom > 1 on a character that ships as a full-body cut-out so they ' +
-    'crop to a waist-up framing matching a tighter portrait. Default ' +
+    'leftCharacter / rightCharacter are ids from the character library (e.g. ' +
+    'female_earlycareer_white, male_middleage_black). Both always render at the ' +
+    'same fixed framing, so swapping a character is just changing its id — they ' +
+    'never differ in size or position. Default ' +
     'duration 450 frames (15 s); first message at ~1.0 s, ~1.85 s between.',
 } as const;
 
@@ -291,30 +304,25 @@ function CameraIcon({ color }: { color: string }) {
 
 // ─── Character panel (colour-matched card containing a portrait PNG) ─────────
 
+// One fixed framing for every character so the two sides always match in size
+// and position. The library PNGs are uniformly-framed waist-up portraits; this
+// scale crops them to a consistent head-and-shoulders shot inside the panel.
+const FIXED_CHARACTER_ZOOM = 1.1;
+
 function CharacterPanel({
   id,
-  zoom,
-  yOffset,
   side,
   background,
   opacity,
 }: {
   id: string;
-  zoom: number;                      // 1.0 = fit; >1 crops upward to waist-up
-  yOffset: number;                   // px to push the image down within panel
   side: 'left' | 'right';
   background: string;
   opacity: number;
 }) {
-  // Zoom-aware fit:
-  //   zoom = 1 → cover-fit, bottom-anchored (full-body if PNG includes legs).
-  //   zoom > 1 → scale the image up from the top of the panel; the bottom
-  //   spills out of the (overflow: hidden) panel, leaving a waist-up crop.
-  const isZoomed = zoom > 1;
-  const transform = [
-    yOffset !== 0 ? `translateY(${yOffset}px)` : '',
-    isZoomed       ? `scale(${zoom})`           : '',
-  ].filter(Boolean).join(' ') || 'none';
+  // Scale every character up from the top of the panel by the same factor; the
+  // bottom spills out of the (overflow: hidden) panel, leaving a uniform crop.
+  const transform = `scale(${FIXED_CHARACTER_ZOOM})`;
   return (
     <div
       style={{
@@ -339,7 +347,7 @@ function CharacterPanel({
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          objectPosition: isZoomed ? 'center top' : 'center bottom',
+          objectPosition: 'center top',
           transform,
           transformOrigin: 'center top',
           // Subtle drop shadow that follows the PNG's alpha mask, so the
@@ -650,17 +658,13 @@ export const TextThread2Characters: React.FC<TextThread2CharactersProps> = ({
   return (
     <AbsoluteFill style={{ background: CANVAS_BG, overflow: 'hidden' }}>
       <CharacterPanel
-        id={leftCharacter.id}
-        zoom={leftCharacter.zoom ?? 1}
-        yOffset={leftCharacter.yOffset ?? 0}
+        id={leftCharacter}
         side="left"
         background={WILD_STRAWBERRY_PANEL_BG}
         opacity={panelOpacity}
       />
       <CharacterPanel
-        id={rightCharacter.id}
-        zoom={rightCharacter.zoom ?? 1}
-        yOffset={rightCharacter.yOffset ?? 0}
+        id={rightCharacter}
         side="right"
         background={DODGER_PANEL_BG}
         opacity={panelOpacity}
@@ -706,22 +710,8 @@ export const TextThread2Characters: React.FC<TextThread2CharactersProps> = ({
 
 export const textThread2CharactersDefaultProps: TextThread2CharactersProps = {
   contactName: 'Maya',
-  leftCharacter: {
-    id: 'woman-with-arms-crossed-smiles-looking-at-camera-2025-03-08-13-35-05-utc',
-    // The woman's PNG is a tight head/torso crop — no zoom needed.
-    zoom: 1.0,
-  },
-  rightCharacter: {
-    id: 'happy-man-entrepreneur-with-arms-folded-2025-03-10-07-42-28-utc',
-    // The man's PNG is a full-body cut-out — modest zoom crops away his
-    // lower legs while keeping his rendered scale a touch smaller than
-    // before, closer in size to the woman.
-    zoom: 1.22,
-    // Push his head down to roughly match the top of the woman's head — her
-    // PNG ships with ~80 px of headroom; his sits flush at the top of the
-    // crop, so we lower him by ~90 px in panel space.
-    yOffset: 90,
-  },
+  leftCharacter: 'female_earlycareer_white',
+  rightCharacter: 'male_middleage_black',
   messages: [
     { side: 'left',  text: 'Quick check — are we still on track for sprint demo Friday?' },
     { side: 'right', text: 'Yep. Two stories left, both in QA.' },
