@@ -576,6 +576,11 @@ function Bubble({
           borderRadius: BUBBLE_RADIUS,
           background: isLeft ? WILD_STRAWBERRY : DODGER_BLUE,
           color:      WHITE,
+          // Break long unbroken tokens (URLs, hashes) so they wrap inside the
+          // bubble instead of overflowing past BUBBLE_MAX_W and clipping at the
+          // feed edge.
+          overflowWrap: 'break-word',
+          wordBreak:    'break-word',
           fontFamily: "'Satoshi', system-ui, sans-serif",
           fontWeight: 500,
           fontSize: 22,
@@ -713,11 +718,11 @@ export const textThread2CharactersDefaultProps: TextThread2CharactersProps = {
   leftCharacter: 'female_earlycareer_white',
   rightCharacter: 'male_middleage_black',
   messages: [
-    { side: 'left',  text: 'Quick check — are we still on track for sprint demo Friday?' },
+    { side: 'left',  text: 'Quick check, are we still on track for sprint demo Friday?' },
     { side: 'right', text: 'Yep. Two stories left, both in QA.' },
     { side: 'left',  text: 'Nice. Need anything from me before then?' },
     { side: 'right', text: 'Sign-off on the new dashboard mockups would help.' },
-    { side: 'left',  text: 'On it tonight — feedback by EOD tomorrow.' },
+    { side: 'left',  text: 'On it tonight. Feedback by EOD tomorrow.' },
     { side: 'right', text: 'Perfect, thanks Maya.' },
   ],
 };
