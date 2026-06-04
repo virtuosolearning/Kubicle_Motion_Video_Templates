@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AbsoluteFill,
   Easing,
@@ -11,28 +11,21 @@ import {
 } from 'remotion';
 import { z } from 'zod';
 
-// Timeline5TilesCharacter — character-only variant of Timeline5Tiles
-// (the renamed Timeline5TilesV2).
-//
-// Same split-screen layout, sweep animation, and 5-step waterfall as the
-// icon version. The only difference is the LEFT panel anchor: instead of
-// a 540×540 line-art icon centred on the dodger-blue gradient panel, this
-// variant renders a CHARACTER PORTRAIT inside the same panel with:
-//   • the face landing at the upper-middle of the panel,
-//   • the figure sized BIG so head + shoulders + chest fill the panel
-//     prominently,
-//   • the body clipped at the panel's rounded right edge (no straight
-//     cut-off line — clipping follows the panel outline),
-//   • a silhouette drop shadow lifting the figure off the gradient.
+// Timeline5TilesCharacter — character-only variant of Timeline5Tiles.
+//   • Left: a blue panel hosting a character portrait from the shared character
+//     library. The portrait is rendered large and matted to the panel's exact
+//     alpha shape, so the head sits near the top, the torso-cut bottom of the
+//     source spills past the panel and is clipped, and nothing ever bleeds onto
+//     the platinum background.
+//   • Right: an oxford-blue rounded container that AUTO-SIZES to the number of
+//     steps (1–5) and stays vertically centred — no empty space below the last
+//     step. Each step reveals with a circle pop-in and a single typewritten
+//     phrase; a progress bar beneath fills 1/N per step.
+//   • Default composition length is 450 frames (15 s @ 30 fps).
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
-const characterAnchorSchema = z.object({
-  id:              z.string().min(1),
-  characterHeight: z.number().min(200).max(1500).optional(),
-  characterY:      z.number().optional(),
-});
-
+// Optional per-render timing overrides. All values in SECONDS.
 export const timeline5TilesCharacterTimingsSchema = z
   .object({
     splitInStart:    z.number().nonnegative(),
@@ -45,81 +38,134 @@ export const timeline5TilesCharacterTimingsSchema = z
   })
   .partial();
 
+// Character library — every PNG in the shared CHARACTER LIBRARY (PNG) set.
+// Swapping a character is just changing its id; all render at one fixed framing.
+export const CHARACTER_IDS = [
+  'Female_middleage_Asian',
+  'female_earlycareer_black',
+  'female_earlycareer_middleeastern',
+  'female_earlycareer_white',
+  'female_earlycareer_white2',
+  'female_earlycareer_white3',
+  'female_midcareer_white',
+  'female_middleage_white',
+  'female_middleage_white2',
+  'female_middleage_white3',
+  'male_earlycareer_black',
+  'male_middleage_asian',
+  'male_middleage_black',
+  'male_middleage_white',
+  'male_middleage_white2',
+  'male_middleage_white3',
+] as const;
+
+export const characterIdSchema = z.enum(CHARACTER_IDS);
+
 export const timeline5TilesCharacterSchema = z.object({
-  steps:     z.array(z.string().min(1).max(30)).length(5),
-  character: characterAnchorSchema,
-  timings:   timeline5TilesCharacterTimingsSchema.optional(),
+  // 1 to 5 step lines, ordered top → bottom. Bold white at 37 px in the
+  // Satoshi family. ≤30 chars each so the typewriter completes in 1.3 s. The
+  // oxford-blue container resizes to fit however many you supply.
+  steps: z.array(z.string().min(1).max(30)).min(1).max(5),
+  // Character portrait — any id from the character library. All render at one
+  // fixed framing, so swapping a character is just changing its id.
+  character: characterIdSchema,
+  timings: timeline5TilesCharacterTimingsSchema.optional(),
 });
 
 export type Timeline5TilesCharacterProps = z.infer<typeof timeline5TilesCharacterSchema>;
 
 export const timeline5TilesCharacterMeta = {
   description:
-    'Split-screen 5-step list. The left panel hosts a character portrait ' +
-    '(face at the upper-middle of the panel, body clipped at the panel\'s ' +
-    'rounded right edge); the right side has the original numbered column + ' +
-    'sweeping loading bar + typewriter steps. Use to put a "presenter" ' +
-    'beside a 5-step process.',
+    'Split-screen compact 1–5 step list with a character portrait on the left. ' +
+    'The portrait is matted to the blue panel and framed head-to-chest; on the ' +
+    'right an oxford-blue container auto-sizes to the number of steps, each ' +
+    'revealing with a circle pop-in and a single typewritten phrase, accompanied ' +
+    'by a progress bar filling beneath. Use to put a "presenter" beside a short ' +
+    'process.',
   authoringNotes:
-    'Always supply exactly 5 steps (Satoshi Bold 37 px, ≤30 chars each). ' +
-    'character.id is a PNG in characters/<id>.png. characterHeight + ' +
-    'characterY tune face position inside the panel; defaults work for ' +
-    'typical presenter PNGs (face ~27 % from PNG top). Default duration ' +
-    '450 frames (15 s).',
+    'Supply 1 to 5 steps in chronological order. Each is a short one-line ' +
+    'description (Satoshi Bold 37 px white, ≤30 chars). Aim for parallel ' +
+    'imperative phrasing. GOOD: "Plan the project scope". BAD: "You should ' +
+    'plan the project carefully" (too long). The oxford-blue container ' +
+    'auto-sizes and stays vertically centred for whatever count you supply, so ' +
+    '1, 2, 3, 4 or 5 all read with no empty space. character is an id from the ' +
+    'character library (use a CHARACTER_IDS value) — every portrait renders at ' +
+    'the same fixed framing, matted to the panel, so swapping a character never ' +
+    'changes its size or position. Default duration 450 frames (15 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const ICON_BASE_SRC      = staticFile('Template-Specific-Assets/icon_base.png');
-const CONTAINER_SRC      = staticFile('Template-Specific-Assets/container_right.png');
-const NUMBER_CIRCLE_SRC  = staticFile('Template-Specific-Assets/number_circle_base.png');
-const LOAD_BAR_BASE_SRC  = staticFile('Template-Specific-Assets/loading_bar_base.png');
-const LOAD_BAR_TOP_SRC   = staticFile('Template-Specific-Assets/loading_bar_top.png');
+const ICON_BASE_SRC       = staticFile('Template-Specific-Assets/icon_base.png');
 const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
-const SATOSHI_BOLD_SRC    = staticFile('fonts/Satoshi-Bold.woff2');
+const SATOSHI_BOLD_SRC     = staticFile('fonts/Satoshi-Bold.woff2');
 
-// ─── Layout constants (lifted verbatim from Timeline5Tiles) ───────────────────
+// ─── Layout constants (1920×1080 canvas) ─────────────────────────────────────
 
+const CANVAS_W = 1920;
+const CANVAS_H = 1080;
+
+// Left blue panel (icon_base.png bbox: x 0..858, y 50..1021 → centre 428, 535).
 const ICON_PANEL_CX = 428;
-const ICON_PANEL_CY = 535;
 
-// Character container — matches the icon_base.png panel bbox so the figure
-// is clipped at the same rounded edge as the panel.
-const CHAR_LEFT   = 0;
-const CHAR_TOP    = 50;
-const CHAR_WIDTH  = 857;
-const CHAR_HEIGHT = 970;
-// Panel has rounded RIGHT corners only (the left edge bleeds off-canvas).
-// Radius measured from icon_base.png: the blue artwork curves over ~80 px
-// at both top-right and bottom-right, so the character container must use
-// the same radius to clip the figure to the panel's silhouette exactly.
-const CHAR_RADIUS = '0 80px 80px 0';
+// Character anchor. Two things to get right:
+//   1. The library PNGs are hard-cropped at the torso (the figure runs to the
+//      very bottom edge of the source). Rendering the portrait LARGER than the
+//      panel and top-anchored pushes that flat cut below the panel, leaving a
+//      clean head-and-shoulders/chest framing.
+//   2. The portrait is matted to the blue panel's exact shape using
+//      icon_base.png's alpha as a CSS mask, so it can never spill past the panel
+//      onto the platinum background (the panel has a large right-corner radius
+//      and a flush left edge — the mask matches it precisely).
+const CHAR_IMG_W    = 1060;                          // portrait size (square)
+const CHAR_IMG_TOP  = 48;                            // portrait top (canvas-y)
+const CHAR_IMG_LEFT = ICON_PANEL_CX - CHAR_IMG_W / 2; // centred on the panel
 
-// Defaults — characterHeight 900 keeps a generous head-and-shoulders
-// framing on the panel; characterY 207 lands the face at ~y=500 in canvas
-// (slightly above the panel centre, leaving comfortable headroom).
-const DEFAULT_CHARACTER_HEIGHT = 900;
-const DEFAULT_CHARACTER_Y      = 207;
+// Right oxford-blue container — horizontal extent fixed; height derived from N.
+const CONTAINER_LEFT   = 944;
+const CONTAINER_W      = 877;
+const CONTAINER_RADIUS = 40;
 
-// Loading bar bbox inside Container_right.png (and Loading_Bar_*.png).
-const LOAD_BAR_LEFT  = 1027;
-const LOAD_BAR_RIGHT = 1737;
+// Vertical model inside the container (measured from container top):
+const BAR_FROM_TOP   = 85;     // progress-bar centre
+const ROW0_FROM_TOP  = 215;    // first step's circle centre
+const ROW_PITCH      = 157.25; // centre-to-centre between steps
+const BOTTOM_PAD      = 131;    // below the last step's circle centre
 
-// Number_Circle_Base.png source bbox: x=996..1121, y=198..323.
-const CIRCLE_LEFT = 996;
-const CIRCLE_TOP  = 198;
-const CIRCLE_W    = 126;
-const CIRCLE_H    = 126;
-const SOURCE_CX = CIRCLE_LEFT + CIRCLE_W / 2;
-const SOURCE_CY = CIRCLE_TOP  + CIRCLE_H / 2;
+function containerHeight(n: number): number {
+  return ROW0_FROM_TOP + (n - 1) * ROW_PITCH + BOTTOM_PAD;
+}
+function containerTop(n: number): number {
+  return (CANVAS_H - containerHeight(n)) / 2;
+}
 
-const ROW_CYS = [263, 420, 578, 735, 892] as const;
+// Progress bar (relative to container left).
+const BAR_LEFT_REL = 83;       // 1027 − CONTAINER_LEFT
+const BAR_WIDTH    = 710;
+const BAR_HEIGHT   = 44;
 
+// Numbered circle.
+const CIRCLE_CX = 1059;
+const CIRCLE_R  = 63;          // diameter 126
+
+// Step text region.
 const TEXT_LEFT  = 1185;
-const TEXT_RIGHT = 1800;
+const TEXT_WIDTH = 615;
 
+// Left panel slides in from this far off-canvas left.
 const PANEL_TRAVEL = 1100;
+// Right container's slide-up + fade-up offset.
 const CONTAINER_TY_FROM = 30;
+
+// ─── Palette (sampled from the original prototype PNGs) ──────────────────────
+
+const CONTAINER_BG = 'linear-gradient(180deg, #041E2E 0%, #020D14 100%)';
+// Track is the dodger blue darkened (matches the original base PNG at 50%).
+const BAR_TRACK    = '#024B80';
+// Bar fill + circles share the same top-lit vertical gradient as the source
+// PNGs: light blue at the top falling to dodger blue at the bottom.
+const BAR_FILL     = 'linear-gradient(180deg, #45B1FF 0%, #0496FF 100%)';
+const CIRCLE_BG    = 'linear-gradient(180deg, #5ABAFF 0%, #1A9FFF 52%, #0496FF 100%)';
 
 // ─── Animation timings ────────────────────────────────────────────────────────
 
@@ -156,23 +202,24 @@ function loadFonts(): Promise<void> {
   return fontsPromise;
 }
 
-// ─── Loading-bar progress (5 segments, 20 % per step) ────────────────────────
+// ─── Loading-bar progress (N segments, 1/N per step) ─────────────────────────
 
 function computeBarProgress(
   frame: number,
   stepFirstStart: number,
   stepStagger: number,
   segDuration: number,
+  n: number,
 ): number {
   if (frame < stepFirstStart) return 0;
-  for (let i = 0; i < 5; i++) {
+  const seg = 1 / n;
+  for (let i = 0; i < n; i++) {
     const segStart = stepFirstStart + i * stepStagger;
     const segEnd   = segStart + segDuration;
-    if (frame < segStart) return i * 0.2;
+    if (frame < segStart) return i * seg;
     if (frame < segEnd) {
       const local = (frame - segStart) / segDuration;
-      const eased = easeInOutCubic(local);
-      return i * 0.2 + eased * 0.2;
+      return i * seg + easeInOutCubic(local) * seg;
     }
   }
   return 1.0;
@@ -180,36 +227,27 @@ function computeBarProgress(
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function IconPanel({
+function CharacterPanel({
   frame,
   splitStart,
   splitEnd,
   characterId,
-  characterHeight,
-  characterY,
 }: {
   frame: number;
   splitStart: number;
   splitEnd: number;
   characterId: string;
-  characterHeight: number;
-  characterY: number;
 }) {
   const x = interpolate(frame, [splitStart, splitEnd], [-PANEL_TRAVEL, 0], {
     extrapolateLeft:  'clamp',
     extrapolateRight: 'clamp',
     easing: easeInOutCubic,
   });
-  const iconOp = interpolate(
-    frame,
-    [splitStart + Math.round((splitEnd - splitStart) * 0.25), splitEnd + 3],
-    [0, 1],
-    {
-      extrapolateLeft:  'clamp',
-      extrapolateRight: 'clamp',
-      easing: easeInOutCubic,
-    },
-  );
+  const op = interpolate(frame, [splitStart + Math.round((splitEnd - splitStart) * 0.25), splitEnd + 3], [0, 1], {
+    extrapolateLeft:  'clamp',
+    extrapolateRight: 'clamp',
+    easing: easeInOutCubic,
+  });
 
   return (
     <div
@@ -220,23 +258,26 @@ function IconPanel({
         pointerEvents: 'none',
       }}
     >
-      {/* Dodger-blue gradient panel (artwork) */}
+      {/* Dodger-blue gradient panel artwork */}
       <Img
         src={ICON_BASE_SRC}
         alt=""
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
       />
-      {/* Character — clipped to the panel shape, face centred in the panel */}
+      {/* Character — matted to the panel's exact alpha shape */}
       <div
         style={{
           position: 'absolute',
-          left:   CHAR_LEFT,
-          top:    CHAR_TOP,
-          width:  CHAR_WIDTH,
-          height: CHAR_HEIGHT,
-          borderRadius: CHAR_RADIUS,
-          overflow: 'hidden',
-          opacity: iconOp,
+          inset: 0,
+          opacity: op,
+          WebkitMaskImage: `url(${ICON_BASE_SRC})`,
+          maskImage:       `url(${ICON_BASE_SRC})`,
+          WebkitMaskSize: `${CANVAS_W}px ${CANVAS_H}px`,
+          maskSize:       `${CANVAS_W}px ${CANVAS_H}px`,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat:       'no-repeat',
+          WebkitMaskPosition: '0px 0px',
+          maskPosition:       '0px 0px',
         }}
       >
         <Img
@@ -244,15 +285,11 @@ function IconPanel({
           alt=""
           style={{
             position: 'absolute',
-            left: ICON_PANEL_CX - CHAR_LEFT,
-            top:  characterY,
-            height: characterHeight,
-            width:  'auto',
-            transform: 'translateX(-50%)',
+            left: CHAR_IMG_LEFT,
+            top:  CHAR_IMG_TOP,
+            width:  CHAR_IMG_W,
+            height: CHAR_IMG_W,
             display: 'block',
-            filter:
-              'drop-shadow(0 18px 24px rgba(2, 18, 36, 0.45)) ' +
-              'drop-shadow(0 4px 8px rgba(2, 18, 36, 0.35))',
           }}
         />
       </div>
@@ -264,6 +301,9 @@ function RightContainer({
   frame,
   splitStart,
   splitEnd,
+  n,
+  cTop,
+  cHeight,
   stepFirstStart,
   stepStagger,
   segDuration,
@@ -271,6 +311,9 @@ function RightContainer({
   frame: number;
   splitStart: number;
   splitEnd: number;
+  n: number;
+  cTop: number;
+  cHeight: number;
   stepFirstStart: number;
   stepStagger: number;
   segDuration: number;
@@ -286,46 +329,45 @@ function RightContainer({
     easing: easeInOutCubic,
   });
 
-  const fillProg   = computeBarProgress(frame, stepFirstStart, stepStagger, segDuration);
-  const rightInset = (1920 - LOAD_BAR_LEFT) - (LOAD_BAR_RIGHT - LOAD_BAR_LEFT) * fillProg;
+  const fillProg = computeBarProgress(frame, stepFirstStart, stepStagger, segDuration, n);
 
   return (
     <div
       style={{
         position: 'absolute',
-        inset: 0,
+        left: CONTAINER_LEFT,
+        top:  cTop,
+        width:  CONTAINER_W,
+        height: cHeight,
+        borderRadius: CONTAINER_RADIUS,
+        background: CONTAINER_BG,
         opacity: op,
         transform: `translateY(${ty}px)`,
         pointerEvents: 'none',
       }}
     >
-      <Img
-        src={CONTAINER_SRC}
-        alt=""
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
-      />
-      <Img
-        src={LOAD_BAR_BASE_SRC}
-        alt=""
+      {/* Progress bar track */}
+      <div
         style={{
           position: 'absolute',
-          inset: 0,
-          width:  '100%',
-          height: '100%',
-          display: 'block',
-          filter: 'brightness(0.50) saturate(0.85)',
+          left: BAR_LEFT_REL,
+          top:  BAR_FROM_TOP - BAR_HEIGHT / 2,
+          width:  BAR_WIDTH,
+          height: BAR_HEIGHT,
+          borderRadius: BAR_HEIGHT / 2,
+          background: BAR_TRACK,
         }}
       />
-      <Img
-        src={LOAD_BAR_TOP_SRC}
-        alt=""
+      {/* Progress bar fill */}
+      <div
         style={{
           position: 'absolute',
-          inset: 0,
-          width:  '100%',
-          height: '100%',
-          display: 'block',
-          clipPath: `inset(0 ${rightInset}px 0 ${LOAD_BAR_LEFT}px)`,
+          left: BAR_LEFT_REL,
+          top:  BAR_FROM_TOP - BAR_HEIGHT / 2,
+          width:  Math.max(BAR_HEIGHT, BAR_WIDTH * fillProg),
+          height: BAR_HEIGHT,
+          borderRadius: BAR_HEIGHT / 2,
+          background: BAR_FILL,
         }}
       />
     </div>
@@ -337,6 +379,7 @@ function Step({
   frame,
   text,
   startFrame,
+  rowCenterY,
   circleScaleDur,
   typeStartOffset,
   typeDur,
@@ -345,6 +388,7 @@ function Step({
   frame: number;
   text: string;
   startFrame: number;
+  rowCenterY: number;
   circleScaleDur: number;
   typeStartOffset: number;
   typeDur: number;
@@ -352,8 +396,7 @@ function Step({
   const localFrame = frame - startFrame;
   if (localFrame < 0) return null;
 
-  const offsetY = ROW_CYS[index]! - ROW_CYS[0];
-
+  // Circle scale-in.
   const scaleProg = interpolate(localFrame, [0, circleScaleDur], [0, 1], {
     extrapolateLeft:  'clamp',
     extrapolateRight: 'clamp',
@@ -361,12 +404,14 @@ function Step({
   const settled   = localFrame >= circleScaleDur;
   const drawScale = settled ? 1 : (scaleProg > 0 ? easeOutBackSubtle(scaleProg) : 0);
 
+  // Number digit fade.
   const numberOp = interpolate(localFrame, [Math.round(circleScaleDur * 0.36), circleScaleDur + 1.5], [0, 1], {
     extrapolateLeft:  'clamp',
     extrapolateRight: 'clamp',
     easing: easeInOutCubic,
   });
 
+  // Typewriter — starts midway through the scale-in.
   const typeProg = interpolate(localFrame, [typeStartOffset, typeStartOffset + typeDur], [0, 1], {
     extrapolateLeft:  'clamp',
     extrapolateRight: 'clamp',
@@ -376,53 +421,46 @@ function Step({
 
   return (
     <>
+      {/* Numbered circle */}
       <div
         style={{
           position: 'absolute',
-          inset: 0,
-          transform: `translateY(${offsetY}px) scale(${drawScale})`,
-          transformOrigin: `${SOURCE_CX}px ${SOURCE_CY}px`,
+          left: CIRCLE_CX - CIRCLE_R,
+          top:  rowCenterY - CIRCLE_R,
+          width:  CIRCLE_R * 2,
+          height: CIRCLE_R * 2,
+          borderRadius: '50%',
+          background: CIRCLE_BG,
+          transform: `scale(${drawScale})`,
+          transformOrigin: 'center center',
           opacity: scaleProg > 0 ? 1 : 0,
-          pointerEvents: 'none',
-        }}
-      >
-        <Img
-          src={NUMBER_CIRCLE_SRC}
-          alt=""
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        />
-      </div>
-
-      <div
-        style={{
-          position: 'absolute',
-          left: CIRCLE_LEFT,
-          top:  CIRCLE_TOP + offsetY,
-          width:  CIRCLE_W,
-          height: CIRCLE_H,
           display: 'flex',
           alignItems:     'center',
           justifyContent: 'center',
-          color: '#FFFFFF',
-          fontFamily: "'Inter', system-ui, sans-serif",
-          fontWeight: 800,
-          fontSize: 60,
-          lineHeight: 1,
-          opacity: numberOp,
-          transform: `scale(${drawScale})`,
-          transformOrigin: 'center center',
           pointerEvents: 'none',
         }}
       >
-        {index + 1}
+        <span
+          style={{
+            color: '#FFFFFF',
+            fontFamily: "'Inter', system-ui, sans-serif",
+            fontWeight: 800,
+            fontSize: 60,
+            lineHeight: 1,
+            opacity: numberOp,
+          }}
+        >
+          {index + 1}
+        </span>
       </div>
 
+      {/* Step text — typewriter, vertically centred against the circle */}
       <div
         style={{
           position: 'absolute',
           left: TEXT_LEFT,
-          top:  ROW_CYS[index],
-          width: TEXT_RIGHT - TEXT_LEFT,
+          top:  rowCenterY,
+          width: TEXT_WIDTH,
           transform: 'translateY(-50%)',
           color: '#FFFFFF',
           fontFamily: "'Satoshi', system-ui, sans-serif",
@@ -466,36 +504,39 @@ export const Timeline5TilesCharacter: React.FC<Timeline5TilesCharacterProps> = (
   const TYPE_DUR       = f(t.typeDuration);
   const SEG_DURATION   = TYPE_OFFSET + TYPE_DUR;
 
-  const characterHeight = character.characterHeight ?? DEFAULT_CHARACTER_HEIGHT;
-  const characterY      = character.characterY      ?? DEFAULT_CHARACTER_Y;
+  const n      = steps.length;
+  const cHeight = containerHeight(n);
+  const cTop    = containerTop(n);
 
   return (
     <AbsoluteFill style={{ background: '#E6ECF2', overflow: 'hidden' }}>
-      <IconPanel
+      <CharacterPanel
         frame={frame}
         splitStart={SPLIT_START}
         splitEnd={SPLIT_END}
-        characterId={character.id}
-        characterHeight={characterHeight}
-        characterY={characterY}
+        characterId={character}
       />
 
       <RightContainer
         frame={frame}
         splitStart={SPLIT_START}
         splitEnd={SPLIT_END}
+        n={n}
+        cTop={cTop}
+        cHeight={cHeight}
         stepFirstStart={STEP_FIRST}
         stepStagger={STEP_STAGGER}
         segDuration={SEG_DURATION}
       />
 
-      {[0, 1, 2, 3, 4].map(i => (
+      {steps.map((text, i) => (
         <Step
           key={i}
           index={i}
           frame={frame}
-          text={steps[i]!}
+          text={text}
           startFrame={STEP_FIRST + i * STEP_STAGGER}
+          rowCenterY={cTop + ROW0_FROM_TOP + i * ROW_PITCH}
           circleScaleDur={CIRCLE_DUR}
           typeStartOffset={TYPE_OFFSET}
           typeDur={TYPE_DUR}
@@ -515,9 +556,5 @@ export const timeline5TilesCharacterDefaultProps: Timeline5TilesCharacterProps =
     'Build the first version',
     'Ship and review',
   ],
-  character: {
-    id: 'female_midcareer_white',
-    characterHeight: 900,
-    characterY:      207,
-  },
+  character: 'female_midcareer_white',
 };
