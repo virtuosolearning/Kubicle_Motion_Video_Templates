@@ -53,7 +53,7 @@ export const process5StepsTimingsSchema = z
   .partial();
 
 export const process5StepsSchema = z.object({
-  steps:   z.array(process5StepsStepSchema).length(5),
+  steps:   z.array(process5StepsStepSchema).min(2).max(5),
   timings: process5StepsTimingsSchema.optional(),
 });
 
@@ -65,12 +65,17 @@ export const process5StepsMeta = {
     'background. Each chevron holds an icon + numbered label. Use for ' +
     'workflows, pipelines, or any sequential process.',
   authoringNotes:
-    'steps is exactly 5 entries in left → right execution order, each with a ' +
-    'label (≤14 chars) and an icon id. Aim for parallel phrasing — all verbs ' +
-    'or all nouns, not a mix. GOOD label: "Plan", "Build", "Test", "Ship", ' +
+    'steps is 2 to 5 entries in left → right execution order, each with a ' +
+    'label (≤14 chars) and an icon id. The chevron chain auto-centres and the ' +
+    'gradient auto-spreads light → dark across whatever count you supply, so ' +
+    '2, 3, 4 or 5 all read cleanly. Aim for parallel phrasing — all verbs or ' +
+    'all nouns, not a mix. GOOD label: "Plan", "Build", "Test", "Ship", ' +
     '"Iterate". BAD label: "Plan everything carefully" (too long), or mixing ' +
-    '"planning" with "Build" (breaks parallel form). Bundled icons: target, ' +
-    'database, cpu, rocket, refresh. Default duration 300 frames (10 s).',
+    '"planning" with "Build" (breaks parallel form). Labels wrap to a second ' +
+    'line if needed, but keeping them short keeps the cadence punchy. Icons are ' +
+    'pulled from the Small-Icons set (white line icons), e.g. arrow-trend-up, ' +
+    'graduation-cap, benefit-hand, ai-assistant, auto-update, search, user. ' +
+    'Default duration 300 frames (10 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -85,12 +90,12 @@ const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
-// Chevrons (5 chained, pointing right). Each chevron has a notch on its
+// Chevrons (2–5 chained, pointing right). Each chevron has a notch on its
 // left (80 px deep) and a tip on its right (80 px) — chained so each
-// chevron's body starts at the previous one's body-end. Total chain
-// stretches across most of the canvas for a "filled" feel. With no title
-// pill above, the chain is centred vertically on the canvas mid-line.
-const NUM_STEPS         = 5;
+// chevron's body starts at the previous one's body-end. The chain is
+// centred on the canvas for whatever count is supplied, so fewer steps sit
+// in the middle rather than drifting left. With no title pill above, the
+// chain is centred vertically on the canvas mid-line.
 const NOTCH_DEPTH       = 80;
 const CHEVRON_BODY_W    = 308;
 const CHEVRON_OUTER_W   = CHEVRON_BODY_W + 2 * NOTCH_DEPTH;    // 468
@@ -99,13 +104,15 @@ const CHEVRON_BOT_Y     = 860;
 const CHEVRON_HEIGHT    = CHEVRON_BOT_Y - CHEVRON_TOP_Y;       // 640
 const CHEVRON_MID_Y     = (CHEVRON_TOP_Y + CHEVRON_BOT_Y) / 2; // 540 — canvas centre
 
-// Chain anchor — first chevron's outer-left x. Span: outer_left → outer_left
-// + (NUM_STEPS−1)*CHEVRON_BODY_W + CHEVRON_OUTER_W. Centred on the canvas.
-const CHEVRON_CHAIN_W   = (NUM_STEPS - 1) * CHEVRON_BODY_W + CHEVRON_OUTER_W;  // 1700
-const CHEVRON_CHAIN_X   = (CANVAS_W - CHEVRON_CHAIN_W) / 2;                    // 110
+// Chain anchor — first chevron's outer-left x, derived from the step count so
+// the whole chain stays centred. Span: (n−1)*CHEVRON_BODY_W + CHEVRON_OUTER_W.
+function chainX(n: number): number {
+  const chainW = (n - 1) * CHEVRON_BODY_W + CHEVRON_OUTER_W;
+  return (CANVAS_W - chainW) / 2;
+}
 
-function chevronGeo(i: number) {
-  const outerLeft  = CHEVRON_CHAIN_X + i * CHEVRON_BODY_W;
+function chevronGeo(i: number, n: number) {
+  const outerLeft  = chainX(n) + i * CHEVRON_BODY_W;
   const bodyLeft   = outerLeft + NOTCH_DEPTH;
   const bodyRight  = bodyLeft + CHEVRON_BODY_W;
   const outerRight = bodyRight + NOTCH_DEPTH;
@@ -113,8 +120,8 @@ function chevronGeo(i: number) {
   return { outerLeft, bodyLeft, bodyRight, outerRight, centerX };
 }
 
-function chevronPath(i: number): string {
-  const g = chevronGeo(i);
+function chevronPath(i: number, n: number): string {
+  const g = chevronGeo(i, n);
   return [
     `M ${g.outerLeft} ${CHEVRON_TOP_Y}`,
     `L ${g.bodyLeft}  ${CHEVRON_MID_Y}`,
@@ -131,6 +138,9 @@ const ICON_SIZE      = 130;
 const ICON_CY        = CHEVRON_TOP_Y + 150;   // 430
 const NUMBER_CY      = CHEVRON_TOP_Y + 330;   // 610
 const LABEL_CY       = CHEVRON_TOP_Y + 500;   // 780
+// Labels wrap within the chevron body instead of overflowing into the next
+// chevron. Kept a touch under CHEVRON_BODY_W (308) for breathing room.
+const LABEL_MAX_W    = 268;
 
 // ─── Animation timings ───────────────────────────────────────────────────────
 
@@ -178,6 +188,14 @@ const CHEVRON_GRADIENTS = [
   ['#0560A8', '#0a3050'],
 ] as const;
 
+// Pick a gradient for chevron i of n, evenly spreading the 5 shades across
+// whatever count is supplied so 2/3/4 steps still read lightest → deepest.
+function gradientFor(i: number, n: number): readonly [string, string] {
+  if (n <= 1) return CHEVRON_GRADIENTS[0];
+  const idx = Math.round((i * (CHEVRON_GRADIENTS.length - 1)) / (n - 1));
+  return CHEVRON_GRADIENTS[idx]!;
+}
+
 const CHEVRON_SHADOW = 'drop-shadow(0 10px 18px rgba(0,0,0,0.30))';
 
 const TEXT_WHITE     = '#FFFFFF';
@@ -207,8 +225,8 @@ function loadFonts(): Promise<void> {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function Chevron({
-  i, frame, startF, durF,
-}: { i: number; frame: number; startF: number; durF: number }) {
+  i, n, frame, startF, durF,
+}: { i: number; n: number; frame: number; startF: number; durF: number }) {
   const local = frame - startF;
   if (local < 0) return null;
 
@@ -222,10 +240,10 @@ function Chevron({
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOutBackSubtle,
   });
 
-  const path = chevronPath(i);
-  const [topColor, bottomColor] = CHEVRON_GRADIENTS[i]!;
+  const path = chevronPath(i, n);
+  const [topColor, bottomColor] = gradientFor(i, n);
   const gradId = `chev-grad-${i}`;
-  const g = chevronGeo(i);
+  const g = chevronGeo(i, n);
 
   return (
     <g
@@ -255,12 +273,13 @@ function Chevron({
 }
 
 function StepContent({
-  i, step, frame, startF,
+  i, n, step, frame, startF,
   iconOffsetF, iconDurF,
   numberOffsetF, numberDurF,
   labelOffsetF, labelDurF,
 }: {
   i: number;
+  n: number;
   step: { label: string; icon: string };
   frame: number;
   startF: number;
@@ -271,7 +290,7 @@ function StepContent({
   const local = frame - startF;
   if (local < 0) return null;
 
-  const g = chevronGeo(i);
+  const g = chevronGeo(i, n);
   const cx = g.centerX;
 
   // Icon — back overshoot scale in.
@@ -351,6 +370,7 @@ function StepContent({
           position: 'absolute',
           left: cx,
           top:  LABEL_CY,
+          width: LABEL_MAX_W,
           transform: `translate(-50%, -50%) translateY(${labelDy}px)`,
           opacity: labelOp,
           color: TEXT_WHITE,
@@ -358,10 +378,10 @@ function StepContent({
           fontWeight: 900,
           fontSize: 48,
           letterSpacing: '-0.020em',
-          lineHeight: 1,
+          lineHeight: 1.08,
           textAlign: 'center',
           textShadow: '0 1px 4px rgba(0,40,80,0.30)',
-          whiteSpace: 'nowrap',
+          overflowWrap: 'break-word',
         }}
       >
         {step.label}
@@ -374,6 +394,7 @@ function StepContent({
 
 export const Process5Steps: React.FC<Process5StepsProps> = ({ steps, timings }) => {
   const frame = useCurrentFrame();
+  const n = steps.length;
 
   const [handle] = useState(() => delayRender('Loading Process5Steps fonts'));
   useEffect(() => {
@@ -420,10 +441,11 @@ export const Process5Steps: React.FC<Process5StepsProps> = ({ steps, timings }) 
         viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
         style={{ position: 'absolute', inset: 0 }}
       >
-        {[0, 1, 2, 3, 4].map(i => (
+        {steps.map((_, i) => (
           <Chevron
             key={`chev-${i}`}
             i={i}
+            n={n}
             frame={frame}
             startF={CHEV_START + i * CHEV_STAG}
             durF={CHEV_DUR}
@@ -437,6 +459,7 @@ export const Process5Steps: React.FC<Process5StepsProps> = ({ steps, timings }) 
         <StepContent
           key={`step-${i}`}
           i={i}
+          n={n}
           step={step}
           frame={frame}
           startF={CONTENT_START + i * CONTENT_STAG}
@@ -456,10 +479,10 @@ export const Process5Steps: React.FC<Process5StepsProps> = ({ steps, timings }) 
 
 export const process5StepsDefaultProps: Process5StepsProps = {
   steps: [
-    { label: 'Define',  icon: 'target'   },
-    { label: 'Collect', icon: 'database' },
-    { label: 'Train',   icon: 'cpu'      },
-    { label: 'Deploy',  icon: 'rocket'   },
-    { label: 'Iterate', icon: 'refresh'  },
+    { label: 'Define',  icon: 'search'        },
+    { label: 'Collect', icon: 'add-document'  },
+    { label: 'Train',   icon: 'ai-assistant'  },
+    { label: 'Deploy',  icon: 'arrow-trend-up'},
+    { label: 'Iterate', icon: 'auto-update'   },
   ],
 };
