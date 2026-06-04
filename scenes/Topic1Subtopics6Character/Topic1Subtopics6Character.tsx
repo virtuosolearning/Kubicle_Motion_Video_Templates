@@ -50,8 +50,26 @@ export const topic1Subtopics6CharacterTimingsSchema = z
   .partial();
 
 export const topic1Subtopics6CharacterSchema = z.object({
-  mainTitle: z.string().min(1).max(30),
-  details:   z.array(z.string().min(1).max(45)).length(6),
+  // The bold headline in the header pill — locked to 3 WORDS OR FEWER
+  // (and ≤30 chars) so the phrase always fits the pill on one line
+  // without being clipped mid-word.
+  mainTitle: z
+    .string()
+    .min(1)
+    .max(30)
+    .refine(
+      s => s.trim().split(/\s+/).length <= 3,
+      { message: 'mainTitle must be 3 words or fewer (one tight phrase per pill)' },
+    ),
+  // Small-Icons id (white-pre-coloured) shown inside the header pill, to
+  // the left of the title. Resolves to small-icons/<id>.svg.
+  titleIcon: z.string().min(1),
+  // 1 to 6 detail lines, one per pill. Each types out sequentially and
+  // the title pill + row band auto-centre vertically together for the
+  // count (3 rows sit centred with the title pill directly above them,
+  // etc.). Each line capped at 38 chars — the largest comfortable fit
+  // inside the 780 px text region at Satoshi Bold 33 px.
+  details:   z.array(z.string().min(1).max(38)).min(1).max(6),
   character: characterAnchorSchema,
   timings:   topic1Subtopics6CharacterTimingsSchema.optional(),
 });
@@ -68,12 +86,18 @@ export const topic1Subtopics6CharacterMeta = {
     'six detail pills that type in sequentially (waterfall). Same ' +
     'animation as Topic1Subtopics6; only the left-panel anchor differs.',
   authoringNotes:
-    'mainTitle ≤30 chars in the header pill. details: exactly 6 lines, ' +
-    'each ≤45 chars, typed into pill rows in turn. character.id is a PNG ' +
-    'in characters/<id>.png. characterHeight + characterY tune the face ' +
-    'position inside the dodger-blue panel; defaults work for typical ' +
-    'presenter PNGs (face ~35% from PNG top). Default duration 300 ' +
-    'frames (10 s).',
+    'mainTitle goes in the header pill — bold white, 3 WORDS OR FEWER and ' +
+    '≤30 chars so the phrase always fits the pill on one line without ' +
+    'clipping. GOOD: "Data Modelling", "Cost Drivers", "Risk Factors". ' +
+    'titleIcon is a Small-Icons id (e.g. "benefit-hand", "ai-assistant", ' +
+    '"arrow-trend-up") — pre-coloured white, sits cleanly in the header pill. ' +
+    'details is 1 to 6 items, each typing into its own pill row; the title ' +
+    'pill + row band auto-centre together for the count. Each line is ' +
+    'capped at 38 chars — the largest comfortable fit inside the shell at ' +
+    'Satoshi Bold 33 px. character.id is a PNG in characters/<id>.png. ' +
+    'characterHeight + characterY tune the face position inside the ' +
+    'dodger-blue panel; defaults work for typical presenter PNGs (face ' +
+    '~35% from PNG top). Default duration 300 frames (10 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -90,15 +114,25 @@ const SATOSHI_BLACK_SRC = staticFile('fonts/Satoshi-Black.woff2');
 const PILL_SRC_CX = 1392;
 const PILL_SRC_CY = 270;
 
-// Centre-y of each detail pill row in the 1920×1080 frame.
-const ROW_CYS = [270, 378, 490, 601, 711, 821] as const;
+// Detail row band — auto-centres vertically for the supplied count (1-6).
+// At count=6 these reproduce the original positions [270, 378, 490, 601,
+// 711, 821] exactly; pitch is the original 110 px.
+const ROW_BAND_CY = 545;
+const ROW_PITCH   = 110;
+const rowCyFor = (count: number, i: number) =>
+  ROW_BAND_CY - ((count - 1) * ROW_PITCH) / 2 + i * ROW_PITCH;
 
 // Text bounds inside each pill.
 const TEXT_LEFT  = 1040;
 const TEXT_RIGHT = 1820;
 
-// Title pill — centre of Title_Pill.png asset.
+// Title pill — centre of Title_Pill.png asset in its original layout.
 const TITLE_CY = 158;
+// Vertical gap between the title pill centre and the first detail row
+// centre in the original 6-row layout (270 - 158 = 112). Kept constant so
+// the title pill always sits the same distance above the band; when the
+// band auto-centres down for fewer rows, the title follows it.
+const TITLE_TO_FIRST_ROW_GAP = 112;
 
 // Bulb icon inside the title pill — left-aligned.
 const BULB_SIZE = 64;
@@ -161,17 +195,6 @@ function loadFonts(): Promise<void> {
     fonts.add(k);
   })();
   return fontsPromise;
-}
-
-// ─── Bulb icon (fixed header decoration) ─────────────────────────────────────
-
-function BulbIcon({ size }: { size: number }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="#FFFFFF">
-      <path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2zm2.86 11.18-.86.62V16h-4v-2.2l-.86-.62a5 5 0 1 1 5.72 0z" />
-      <path d="M10 22h4a1 1 0 0 1 0 2h-4a1 1 0 0 1 0-2z" />
-    </svg>
-  );
 }
 
 // ─── Character anchor (dodger-blue panel + portrait) ─────────────────────────
@@ -243,11 +266,15 @@ function CharacterAnchor({
 function HeaderPill({
   frame,
   mainTitle,
+  titleIcon,
+  titleCY,
   slideStart,
   slideDur,
 }: {
   frame: number;
   mainTitle: string;
+  titleIcon: string;
+  titleCY: number;
   slideStart: number;
   slideDur: number;
 }) {
@@ -257,12 +284,22 @@ function HeaderPill({
     easing: cubicInOut,
   });
 
+  // Title text is width-capped so the rightmost edge sits inside the
+  // dodger-blue pill (~x=1840) and overflow is clipped — long copy can
+  // never spill onto the oxford-blue background.
+  const titleLeft  = BULB_X + BULB_SIZE + 22;
+  const titleWidth = 1840 - titleLeft - 16;
+
+  // For counts <6 the band auto-centres down; the title pill must follow
+  // so the composition stays grouped. Shift everything by the same delta.
+  const verticalShift = titleCY - TITLE_CY;
+
   return (
     <div
       style={{
         position: 'absolute',
         inset: 0,
-        transform: `translateX(${slideX}px)`,
+        transform: `translate(${slideX}px, ${verticalShift}px)`,
         pointerEvents: 'none',
       }}
     >
@@ -278,15 +315,23 @@ function HeaderPill({
           top:  TITLE_CY - BULB_SIZE / 2,
           width:  BULB_SIZE,
           height: BULB_SIZE,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
-        <BulbIcon size={BULB_SIZE} />
+        <Img
+          src={staticFile(`small-icons/${titleIcon}.svg`)}
+          alt=""
+          style={{ width: BULB_SIZE, height: BULB_SIZE, display: 'block' }}
+        />
       </div>
       <div
         style={{
           position: 'absolute',
-          left: BULB_X + BULB_SIZE + 22,
+          left: titleLeft,
           top:  TITLE_CY,
+          width: titleWidth,
           transform: 'translateY(-50%)',
           color: '#FFFFFF',
           fontFamily: "'Satoshi', system-ui, sans-serif",
@@ -294,6 +339,7 @@ function HeaderPill({
           fontSize: 55,
           letterSpacing: '-0.005em',
           whiteSpace: 'nowrap',
+          overflow: 'hidden',
         }}
       >
         {mainTitle}
@@ -305,21 +351,21 @@ function HeaderPill({
 // ─── Detail pill ──────────────────────────────────────────────────────────────
 
 function DetailPill({
-  index,
+  cy,
   frame,
   text,
   rowStart,
   scaleDur,
   typeDur,
 }: {
-  index: number;
+  cy: number;
   frame: number;
   text: string;
   rowStart: number;
   scaleDur: number;
   typeDur: number;
 }) {
-  const targetCY = ROW_CYS[index]!;
+  const targetCY = cy;
   const offsetY  = targetCY - PILL_SRC_CY;
   const scaleEnd = rowStart + scaleDur;
 
@@ -368,6 +414,7 @@ function DetailPill({
           fontSize: 33,
           letterSpacing: '-0.005em',
           whiteSpace: 'nowrap',
+          overflow: 'hidden',
           opacity: settled ? 1 : 0,
           pointerEvents: 'none',
         }}
@@ -382,6 +429,7 @@ function DetailPill({
 
 export const Topic1Subtopics6Character: React.FC<Topic1Subtopics6CharacterProps> = ({
   mainTitle,
+  titleIcon,
   details,
   character,
   timings,
@@ -444,16 +492,18 @@ export const Topic1Subtopics6Character: React.FC<Topic1Subtopics6CharacterProps>
       <HeaderPill
         frame={frame}
         mainTitle={mainTitle}
+        titleIcon={titleIcon}
+        titleCY={rowCyFor(details.length, 0) - TITLE_TO_FIRST_ROW_GAP}
         slideStart={HEADER_START}
         slideDur={HEADER_DUR}
       />
 
-      {([0, 1, 2, 3, 4, 5] as const).map(i => (
+      {details.map((text, i) => (
         <DetailPill
           key={i}
-          index={i}
+          cy={rowCyFor(details.length, i)}
           frame={frame}
-          text={details[i]!}
+          text={text}
           rowStart={ROW0_START + i * ROW_TOTAL}
           scaleDur={ROW_SCALE_DUR}
           typeDur={ROW_TYPE_DUR}
@@ -466,7 +516,8 @@ export const Topic1Subtopics6Character: React.FC<Topic1Subtopics6CharacterProps>
 // ─── Demo / test props ────────────────────────────────────────────────────────
 
 export const topic1Subtopics6CharacterDefaultProps: Topic1Subtopics6CharacterProps = {
-  mainTitle: 'Data modelling',
+  mainTitle: 'Data Modelling',
+  titleIcon: 'ai-assistant',
   character: {
     id: 'presenter-grey',
     // 1414×1441 PNG with the face centred horizontally; face is ~35 %
