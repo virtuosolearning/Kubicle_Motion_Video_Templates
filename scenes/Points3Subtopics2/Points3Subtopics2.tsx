@@ -30,8 +30,17 @@ import { z } from 'zod';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 const sectionSchema = z.object({
-  // Title pill caption — bold ink, Satoshi Black 55 px. ≤30 chars to fit.
-  mainText: z.string().min(1).max(30),
+  // Title pill caption — bold ink, Satoshi Black 55 px. Capped at 3 WORDS
+  // (and ≤30 chars) so the phrase fits the pill on one line without ever
+  // being cut off mid-word.
+  mainText: z
+    .string()
+    .min(1)
+    .max(30)
+    .refine(
+      s => s.trim().split(/\s+/).length <= 3,
+      { message: 'mainText must be 3 words or fewer (one tight phrase per pill)' },
+    ),
   // Two supporting detail lines that type out in the shells. ≤45 chars each.
   detailTexts: z.array(z.string().min(1).max(45)).length(2),
 });
@@ -60,7 +69,15 @@ export const points3Subtopics2Schema = z.object({
   // Icon ID for the anchor on the left panel (e.g. "graphic"). Should be an
   // SVG patched to #E6ECF2 base + Dodger Blue accents.
   anchor: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
+    // Icon anchor — locked to the -dark-suffix variant from the master
+    // Icons/ catalogue. Those SVGs are platinum + Dodger-Blue line art and
+    // read brightly on the Oxford-Blue panel; the -light variants disappear.
+    z.object({
+      kind: z.literal('icon'),
+      id:   z.string().min(1).regex(/-dark$/, {
+        message: 'Anchor icon must end with -dark (use a -dark-suffix id from the Icons/ catalogue)',
+      }),
+    }),
     z.object({ kind: z.literal('character'), id: z.string().min(1) }),
   ]),
   timings: points3Subtopics2TimingsSchema.optional(),
@@ -76,13 +93,18 @@ export const points3Subtopics2Meta = {
     'that scale in + type out. Best for 3 main ideas with 2 supporting points each.',
   authoringNotes:
     'Always supply exactly 3 sections. mainText is the title pill caption — bold ' +
-    'ink at 55 px, ≤30 chars. detailTexts[0] and [1] type out underneath — Satoshi ' +
-    'Bold white at 33 px, ≤45 chars each. Keep parallel structure across ' +
-    'sections (e.g. all noun phrases). GOOD mainText: "Plan", "Build", "Ship". ' +
-    'GOOD detailTexts: "Define entities and goals", "Map data flows". ' +
-    "BAD: long sentences — strip to noun phrases. anchor is a discriminated union " +
-    "({ kind: 'icon', id } or { kind: 'character', id }) — id is the filename stem " +
-    'the left frame; pick from the catalog. Default duration 450 frames (15 s).',
+    'ink at 55 px, 3 WORDS OR FEWER and ≤30 chars so the phrase fits the pill on ' +
+    'one line without being cut off mid-word. detailTexts[0] and [1] type out ' +
+    'underneath — Satoshi Bold white at 33 px, ≤45 chars each. Keep parallel ' +
+    'structure across sections (e.g. all noun phrases). GOOD mainText: ' +
+    '"Plan", "Build", "Ship", "Measure Outcomes". GOOD detailTexts: ' +
+    '"Define entities and goals", "Map data flows". BAD: long sentences — ' +
+    "strip to noun phrases. anchor is a discriminated union: " +
+    "{ kind: 'icon', id } MUST use a -dark-suffix id from the master Icons/ " +
+    "catalogue (e.g. 'business-success-path-dark') — those SVGs are platinum + " +
+    'Dodger Blue and read on the Oxford-Blue panel. ' +
+    "{ kind: 'character', id } picks a PNG from the character library. " +
+    'Default duration 450 frames (15 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -313,6 +335,7 @@ function Section({
             fontSize: 55,
             letterSpacing: '-0.005em',
             whiteSpace: 'nowrap',
+            overflow: 'hidden',
             opacity: titleTextOp,
           }}
         >
@@ -372,6 +395,7 @@ function Section({
                 fontSize: 33,
                 letterSpacing: '-0.005em',
                 whiteSpace: 'nowrap',
+                overflow: 'hidden',
                 opacity: settled ? 1 : 0,
               }}
             >
@@ -533,7 +557,7 @@ export const points3Subtopics2DefaultProps: Points3Subtopics2Props = {
       detailTexts: ['Roll out to all users', 'Track adoption and outcomes'],
     },
   ],
-  anchor: { kind: 'icon', id: 'graphic' },
+  anchor: { kind: 'icon', id: 'business-success-path-dark' },
 };
 
 export const points3Subtopics2CharacterDemoProps: Points3Subtopics2Props = {
