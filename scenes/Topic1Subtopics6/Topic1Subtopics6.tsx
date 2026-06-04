@@ -38,18 +38,37 @@ export const topic1Subtopics6TimingsSchema = z
   .partial();
 
 export const topic1Subtopics6Schema = z.object({
-  // The bold headline in the header pill (e.g. "Data modelling").
-  // One line only — keep under 30 characters.
-  mainTitle: z.string().min(1).max(30),
-  // Exactly 6 detail lines, one per pill. Each types out sequentially.
-  // Aim for under 45 characters so text fits the pill without wrapping.
-  details: z.array(z.string().min(1).max(45)).length(6),
-  // Icon ID for the large left-panel anchor illustration. Matches a filename
-  // in icons/ without the .svg extension (e.g. "edit", "analytics").
-  anchor: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
-    z.object({ kind: z.literal('character'), id: z.string().min(1) }),
-  ]),
+  // The bold headline in the header pill — locked to 3 WORDS OR FEWER (and
+  // ≤30 chars) so the phrase always fits the pill on one line without
+  // being clipped mid-word.
+  mainTitle: z
+    .string()
+    .min(1)
+    .max(30)
+    .refine(
+      s => s.trim().split(/\s+/).length <= 3,
+      { message: 'mainTitle must be 3 words or fewer (one tight phrase per pill)' },
+    ),
+  // Small-Icons id (white-pre-coloured) shown inside the header pill, to
+  // the left of the title. Resolves to small-icons/<id>.svg — pick any
+  // id from the Small-Icons set ("benefit-hand", "ai-assistant",
+  // "search (1)", "arrow-trend-up", …).
+  titleIcon: z.string().min(1),
+  // 1 to 6 detail lines, one per pill. Each types out sequentially and
+  // the title pill + row band auto-centre vertically together for the
+  // count (3 rows sit centred in the frame with the title pill directly
+  // above them, etc.). Each line is capped at 38 chars — the largest
+  // comfortable fit inside the 780 px text region at Satoshi Bold 33 px.
+  // The overflow:hidden clip is a defensive backstop.
+  details: z.array(z.string().min(1).max(38)).min(1).max(6),
+  // Master Icons/ catalogue id for the large left-panel anchor. MUST end
+  // with `-light` — those SVGs have light-coloured strokes that read on
+  // the platinum-blue left panel; -dark variants would vanish into it.
+  anchor: z.object({
+    id: z.string().min(1).regex(/-light$/, {
+      message: 'Anchor icon must end with -light (use a -light-suffix id from the Icons/ catalogue)',
+    }),
+  }),
   timings: topic1Subtopics6TimingsSchema.optional(),
 });
 
@@ -63,14 +82,20 @@ export const topic1Subtopics6Meta = {
     '(waterfall). Best for unpacking a single idea into its main supporting ' +
     'facts, drivers, dimensions, or examples — one concept fanning out into six.',
   authoringNotes:
-    'mainTitle goes in the header pill — bold white, one line, max 30 chars. ' +
-    'GOOD: "Data modelling", "Cost drivers", "Risk factors". ' +
-    'BAD: "Understanding data modelling concepts" (too long). ' +
-    'details is an array of exactly 6 items, each typing into its own pill row. ' +
-    'Aim for parallel phrasing — noun phrases or short sentences, max 45 chars each. ' +
-    "anchor is a discriminated union: { kind: 'icon', id } renders " +
-    "icons/<id>.svg (520×520 line art); { kind: 'character', id } renders " +
-    'characters/<id>.png at 600×880 bottom-anchored (presenter-style). ' +
+    'mainTitle goes in the header pill — bold white, 3 WORDS OR FEWER and ≤30 ' +
+    'chars so the phrase always fits the pill on one line without clipping. ' +
+    'GOOD: "Data modelling", "Cost drivers", "Risk factors". BAD: "Cost ' +
+    'drivers in cloud SRE 24/7" (4+ words — will fail validation). ' +
+    'titleIcon is a Small-Icons id (e.g. "benefit-hand", "ai-assistant", ' +
+    '"arrow-trend-up") — those SVGs are pre-coloured white and sit cleanly ' +
+    'inside the header pill. details is 1 to 7 items, each typing into its ' +
+    'own pill row; the row band auto-centres vertically for the count. Each ' +
+    'line is capped at 38 chars — the largest comfortable fit inside the ' +
+    'shell at Satoshi Bold 33 px. Aim for parallel phrasing — noun phrases ' +
+    'or short sentences. anchor is { id: "<…>-light" } — pick a -light-suffix ' +
+    'id from the master Icons/ catalogue ("ai-agent-aibrain-light", ' +
+    '"business-strategy-checklist-light"). For the character-anchor variant ' +
+    'of this layout, use the sibling template Topic1Subtopics6Character. ' +
     'Default duration 300 frames (10 s).',
 } as const;
 
@@ -88,15 +113,26 @@ const SATOSHI_BLACK_SRC = staticFile('fonts/Satoshi-Black.woff2');
 const PILL_SRC_CX = 1392;   // (949 + 1835) / 2
 const PILL_SRC_CY = 270;    // (228 + 313) / 2
 
-// Centre-y of each detail pill row in the 1920×1080 frame.
-const ROW_CYS = [270, 378, 490, 601, 711, 821] as const;
+// Detail row band — auto-centres vertically for the supplied count (1-7).
+// At count=6 these reproduce the original positions [270, 378, 490, 601,
+// 711, 821] exactly; pitch is the original 110 px.
+const ROW_BAND_CY = 545;
+const ROW_PITCH   = 110;
+const rowCyFor = (count: number, i: number) =>
+  ROW_BAND_CY - ((count - 1) * ROW_PITCH) / 2 + i * ROW_PITCH;
 
 // Text bounds inside each pill.
 const TEXT_LEFT  = 1040;
 const TEXT_RIGHT = 1820;
 
-// Title pill — centre of Title_Pill.png asset.
+// Title pill — centre of Title_Pill.png asset in its original layout.
 const TITLE_CY = 158;
+// Vertical gap between the title pill centre and the first detail row
+// centre in the original 6-row layout (270 - 158 = 112). Kept constant so
+// the title pill always sits the same distance above the band, no matter
+// the count — when the band auto-centres down for fewer rows, the title
+// follows it.
+const TITLE_TO_FIRST_ROW_GAP = 112;
 
 // Bulb icon inside the title pill — left-aligned.
 const BULB_SIZE = 64;
@@ -106,13 +142,6 @@ const BULB_X    = 985;
 const ANCHOR_SIZE = 520;
 const ANCHOR_CX   = 432;
 const ANCHOR_CY   = 540;
-
-// Character bbox — larger than the icon so the presenter has card-height
-// presence on the no-panel platinum-blue background. Bottom-anchored.
-const CHAR_WIDTH  = 600;
-const CHAR_HEIGHT = 880;
-const CHAR_LEFT   = ANCHOR_CX - CHAR_WIDTH / 2;   // 132
-const CHAR_TOP    = 100;
 
 // Oxford Blue BG travel distance: slides in from the right.
 const NAVY_TRAVEL = 1080;
@@ -155,29 +184,16 @@ function loadFonts(): Promise<void> {
   return fontsPromise;
 }
 
-// ─── Bulb icon (fixed header decoration) ─────────────────────────────────────
-
-function BulbIcon({ size }: { size: number }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="#FFFFFF">
-      <path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2zm2.86 11.18-.86.62V16h-4v-2.2l-.86-.62a5 5 0 1 1 5.72 0z" />
-      <path d="M10 22h4a1 1 0 0 1 0 2h-4a1 1 0 0 1 0-2z" />
-    </svg>
-  );
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-type AnchorProp = Topic1Subtopics6Props['anchor'];
 
 function AnchorIcon({
   frame,
-  anchor,
+  anchorId,
   iconFadeStart,
   iconFadeDur,
 }: {
   frame: number;
-  anchor: AnchorProp;
+  anchorId: string;
   iconFadeStart: number;
   iconFadeDur: number;
 }) {
@@ -187,49 +203,22 @@ function AnchorIcon({
     easing: cubicInOut,
   });
 
-  if (anchor.kind === 'icon') {
-    return (
-      <div
-        style={{
-          position: 'absolute',
-          left: ANCHOR_CX - ANCHOR_SIZE / 2,
-          top:  ANCHOR_CY - ANCHOR_SIZE / 2,
-          width:  ANCHOR_SIZE,
-          height: ANCHOR_SIZE,
-          opacity,
-          pointerEvents: 'none',
-        }}
-      >
-        <Img
-          src={staticFile(`icons/${anchor.id}.svg`)}
-          alt=""
-          style={{ width: ANCHOR_SIZE, height: ANCHOR_SIZE }}
-        />
-      </div>
-    );
-  }
   return (
     <div
       style={{
         position: 'absolute',
-        left: CHAR_LEFT,
-        top:  CHAR_TOP,
-        width:  CHAR_WIDTH,
-        height: CHAR_HEIGHT,
+        left: ANCHOR_CX - ANCHOR_SIZE / 2,
+        top:  ANCHOR_CY - ANCHOR_SIZE / 2,
+        width:  ANCHOR_SIZE,
+        height: ANCHOR_SIZE,
         opacity,
         pointerEvents: 'none',
       }}
     >
       <Img
-        src={staticFile(`characters/${anchor.id}.png`)}
+        src={staticFile(`icons/${anchorId}.svg`)}
         alt=""
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          objectPosition: '50% 100%',
-          display: 'block',
-        }}
+        style={{ width: ANCHOR_SIZE, height: ANCHOR_SIZE }}
       />
     </div>
   );
@@ -238,11 +227,15 @@ function AnchorIcon({
 function HeaderPill({
   frame,
   mainTitle,
+  titleIcon,
+  titleCY,
   slideStart,
   slideDur,
 }: {
   frame: number;
   mainTitle: string;
+  titleIcon: string;
+  titleCY: number;
   slideStart: number;
   slideDur: number;
 }) {
@@ -252,12 +245,23 @@ function HeaderPill({
     easing: cubicInOut,
   });
 
+  // Title text starts just after the bulb glyph; we cap its width so the
+  // rightmost edge sits inside the dodger-blue pill (~x=1840) and clip
+  // any overflow so long copy can never spill onto the oxford-blue bg.
+  const titleLeft  = BULB_X + BULB_SIZE + 22;
+  const titleWidth = 1840 - titleLeft - 16;
+
+  // For counts <6 the band auto-centres down; the title pill must follow
+  // so the composition stays together. Shift the full-canvas title pill
+  // PNG and the icon/text positions by the same delta.
+  const verticalShift = titleCY - TITLE_CY;
+
   return (
     <div
       style={{
         position: 'absolute',
         inset: 0,
-        transform: `translateX(${slideX}px)`,
+        transform: `translate(${slideX}px, ${verticalShift}px)`,
         pointerEvents: 'none',
       }}
     >
@@ -273,15 +277,23 @@ function HeaderPill({
           top:  TITLE_CY - BULB_SIZE / 2,
           width:  BULB_SIZE,
           height: BULB_SIZE,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
-        <BulbIcon size={BULB_SIZE} />
+        <Img
+          src={staticFile(`small-icons/${titleIcon}.svg`)}
+          alt=""
+          style={{ width: BULB_SIZE, height: BULB_SIZE, display: 'block' }}
+        />
       </div>
       <div
         style={{
           position: 'absolute',
-          left: BULB_X + BULB_SIZE + 22,
+          left: titleLeft,
           top:  TITLE_CY,
+          width: titleWidth,
           transform: 'translateY(-50%)',
           color: '#FFFFFF',
           fontFamily: "'Satoshi', system-ui, sans-serif",
@@ -289,6 +301,7 @@ function HeaderPill({
           fontSize: 55,
           letterSpacing: '-0.005em',
           whiteSpace: 'nowrap',
+          overflow: 'hidden',
         }}
       >
         {mainTitle}
@@ -298,21 +311,21 @@ function HeaderPill({
 }
 
 function DetailPill({
-  index,
+  cy,
   frame,
   text,
   rowStart,
   scaleDur,
   typeDur,
 }: {
-  index: number;
+  cy: number;
   frame: number;
   text: string;
   rowStart: number;
   scaleDur: number;
   typeDur: number;
 }) {
-  const targetCY = ROW_CYS[index]!;
+  const targetCY = cy;
   const offsetY  = targetCY - PILL_SRC_CY;
   const scaleEnd = rowStart + scaleDur;
 
@@ -363,6 +376,7 @@ function DetailPill({
           fontSize: 33,
           letterSpacing: '-0.005em',
           whiteSpace: 'nowrap',
+          overflow: 'hidden',
           opacity: settled ? 1 : 0,
           pointerEvents: 'none',
         }}
@@ -377,6 +391,7 @@ function DetailPill({
 
 export const Topic1Subtopics6: React.FC<Topic1Subtopics6Props> = ({
   mainTitle,
+  titleIcon,
   details,
   anchor,
   timings,
@@ -426,7 +441,7 @@ export const Topic1Subtopics6: React.FC<Topic1Subtopics6Props> = ({
 
       <AnchorIcon
         frame={frame}
-        anchor={anchor}
+        anchorId={anchor.id}
         iconFadeStart={ICON_FADE_START}
         iconFadeDur={ICON_FADE_DUR}
       />
@@ -434,16 +449,18 @@ export const Topic1Subtopics6: React.FC<Topic1Subtopics6Props> = ({
       <HeaderPill
         frame={frame}
         mainTitle={mainTitle}
+        titleIcon={titleIcon}
+        titleCY={rowCyFor(details.length, 0) - TITLE_TO_FIRST_ROW_GAP}
         slideStart={HEADER_START}
         slideDur={HEADER_DUR}
       />
 
-      {([0, 1, 2, 3, 4, 5] as const).map(i => (
+      {details.map((text, i) => (
         <DetailPill
           key={i}
-          index={i}
+          cy={rowCyFor(details.length, i)}
           frame={frame}
-          text={details[i]!}
+          text={text}
           rowStart={ROW0_START + i * ROW_TOTAL}
           scaleDur={ROW_SCALE_DUR}
           typeDur={ROW_TYPE_DUR}
@@ -457,7 +474,8 @@ export const Topic1Subtopics6: React.FC<Topic1Subtopics6Props> = ({
 
 export const topic1Subtopics6DefaultProps: Topic1Subtopics6Props = {
   mainTitle: 'Data modelling',
-  anchor: { kind: 'icon', id: 'edit' },
+  titleIcon: 'ai-assistant',
+  anchor: { id: 'ai-agent-aibrain-light' },
   details: [
     'Define entities and relationships',
     'Choose a normalisation level',
@@ -466,9 +484,4 @@ export const topic1Subtopics6DefaultProps: Topic1Subtopics6Props = {
     'Review with stakeholders',
     'Document the final schema',
   ],
-};
-
-export const topic1Subtopics6CharacterDemoProps: Topic1Subtopics6Props = {
-  ...topic1Subtopics6DefaultProps,
-  anchor: { kind: 'character', id: 'presenter-grey' },
 };
