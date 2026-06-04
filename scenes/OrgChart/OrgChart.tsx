@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   AbsoluteFill,
   Easing,
-  Img,
   continueRender,
   delayRender,
   interpolate,
@@ -11,74 +10,68 @@ import {
 } from 'remotion';
 import { z } from 'zod';
 
-// OrgChart — 3-level organisational chart.
+// OrgChart — configurable hierarchy / structure chart.
 //   • Platinum-blue (#E6ECF2) canvas.
-//   • Hierarchy: 1 CEO at the top, 3 direct reports below, 2 sub-reports
-//     stacked under each direct (10 cards total).
-//   • Cards distinguished by level, not branch — top is the darkest oxford,
-//     directs are dodger blue, subs are a lighter dodger. Keeps the chart
-//     monochrome and on-palette.
-//   • Each card carries a white avatar circle with a dodger-blue person
-//     icon, plus name + position to the right.
-//   • Connectors are soft slate-blue lines drawn on with stroke-dashoffset.
-//   • Animation reveals top-down — CEO scales in, connector tree draws to
-//     the directs row, directs stagger in, vertical lines to subs draw, sub
-//     rows cascade in. Subtle back overshoot on every card scale-in.
+//   • 1 fixed box at the top, then 1–5 rows below it, each holding 1–4 boxes
+//     (e.g. a 1-4-3-4 structure). Rows can be uneven widths.
+//   • Each box carries a single text label (no people / names / avatars).
+//   • A central vertical "spine" runs down the middle; each row hangs off the
+//     spine via a horizontal bar with a short drop to every box. This keeps the
+//     connectors sensible even when adjacent rows have different box counts.
+//   • Top box is deep oxford; every lower box is dodger blue — monochrome,
+//     on-palette. Connectors are soft slate-blue lines drawn on with
+//     stroke-dashoffset.
+//   • Reveal is top-down: the top box scales in, then each row's spine segment
+//     + bar + drops draw and its boxes pop in, row by row.
+//   • The whole chart auto-centres vertically and each row auto-centres
+//     horizontally, so any 1→N→… shape stays balanced on the canvas.
 //   • Default duration 300 frames (10 s @ 30 fps).
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
-export const orgChartPersonSchema = z.object({
-  name:     z.string().min(1).max(28),
-  position: z.string().min(1).max(28),
-});
+// A single box label. Kept short — boxes get narrow at 4-per-row.
+export const orgChartLabelSchema = z.string().min(1).max(40);
 
-export const orgChartBranchSchema = z.object({
-  direct: orgChartPersonSchema,
-  subs:   z.array(orgChartPersonSchema).length(2),  // 2 sub-reports per direct
-});
+// One row of the chart: 1 to 4 box labels.
+export const orgChartRowSchema = z.array(orgChartLabelSchema).min(1).max(4);
 
 export const orgChartTimingsSchema = z
   .object({
-    ceoStart:        z.number().nonnegative(),
-    ceoDuration:     z.number().positive(),
-    trunkOffset:     z.number().nonnegative(),
-    trunkDuration:   z.number().positive(),
-    directsStart:    z.number().nonnegative(),
-    directsStagger:  z.number().positive(),
-    directsDuration: z.number().positive(),
-    subTrunkOffset:  z.number().nonnegative(),
-    subTrunkDuration: z.number().positive(),
-    subsStart:       z.number().nonnegative(),
-    subsRowStagger:  z.number().positive(),
-    subsColStagger:  z.number().positive(),
-    subsDuration:    z.number().positive(),
+    topStart:          z.number().nonnegative(),  // when the top box scales in
+    topDuration:       z.number().positive(),
+    rowsStart:         z.number().nonnegative(),   // when the first row begins
+    rowStagger:        z.number().positive(),      // gap between successive rows
+    connectorDuration: z.number().positive(),      // spine+bar+drops draw per row
+    boxStagger:        z.number().positive(),      // gap between boxes in a row
+    boxDuration:       z.number().positive(),
   })
   .partial();
 
 export const orgChartSchema = z.object({
-  ceo:      orgChartPersonSchema,
-  branches: z.array(orgChartBranchSchema).length(3),
-  timings:  orgChartTimingsSchema.optional(),
+  // The single box at the very top (always exactly one).
+  top:    orgChartLabelSchema,
+  // 1 to 5 rows below the top, each holding 1 to 4 boxes. Uneven widths are
+  // fine — e.g. [[4 boxes], [3 boxes], [4 boxes]] renders a 1-4-3-4 chart.
+  rows:   z.array(orgChartRowSchema).min(1).max(5),
+  timings: orgChartTimingsSchema.optional(),
 });
 
 export type OrgChartProps = z.infer<typeof orgChartSchema>;
 
 export const orgChartMeta = {
   description:
-    'Three-level organisational chart: 1 CEO at the top, 3 direct reports, ' +
-    '2 sub-reports under each direct. Cards are colour-coded by level (CEO ' +
-    'oxford, directs dodger blue, subs lighter dodger). Use for team ' +
-    'structures, reporting lines, or any 1→3→6 hierarchy.',
+    'Configurable structure chart: one fixed box at the top, then 1–5 rows ' +
+    'below it of 1–4 boxes each (e.g. 1-4-3-4). Each box is a single text ' +
+    'label — no people or avatars. A central spine links the rows, the chart ' +
+    'auto-centres, and it reveals top-down row by row.',
   authoringNotes:
-    'Supply ceo (single person), then exactly 3 branches; each branch has one ' +
-    'direct report and exactly 2 sub-reports under that direct. Each person ' +
-    'carries a name (≤28 chars, Satoshi Bold white) and a position (≤28 chars, ' +
-    'Satoshi Medium dim-white). GOOD: name "Alex Morgan", position ' +
-    '"VP Engineering". BAD: cramming "Alex Morgan, VP Engineering" into the ' +
-    'name field — split the role into the position line. Avatars are auto-' +
-    'rendered as white circles with a bundled person icon in dodger blue (no ' +
-    'headshots). Default duration 300 frames (10 s).',
+    'Supply top (one label for the top box) and rows (1 to 5 rows, each an ' +
+    'array of 1 to 4 short labels). Rows may be different widths — a 1-4-3-4 ' +
+    'shape is rows: [[..4..],[..3..],[..4..]]. Labels are ≤40 chars and wrap ' +
+    'to two lines; keep them short (a team, function, or stage — "Engineering", ' +
+    '"AI Lab", "Q3 Launch") since boxes get narrow at 4-per-row. The top box ' +
+    'is oxford; every lower box is dodger blue. Default duration 300 frames ' +
+    '(10 s); add rows/boxes and the reveal simply takes a little longer.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -92,58 +85,18 @@ const SATOSHI_MEDIUM_SRC = staticFile('fonts/Satoshi-Medium.woff2');
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
-// Vertical offset applied to every chart element — shifts the whole chart
-// down so it's centred in the 1080-tall canvas instead of starting at the top.
-const CHART_Y_OFFSET = 112;
+// Uniform box size across all rows (sized so 4 fit comfortably per row).
+const BOX_W = 400;
+const BOX_H = 104;
+const H_GAP = 44;     // horizontal gap between boxes in a row
+const TOP_BOX_W = 440; // the single top box is a touch wider for emphasis
 
-// CEO card (level 1)
-const CEO_W       = 420;
-const CEO_H       = 130;
-const CEO_CX      = 960;
-const CEO_TOP_Y   = 80 + CHART_Y_OFFSET;         // 192
-const CEO_BOT_Y   = CEO_TOP_Y + CEO_H;           // 322
-const CEO_LEFT    = CEO_CX - CEO_W / 2;          // 750
-
-// Connector trunk between CEO and directs row
-const TRUNK_TOP_Y    = CEO_BOT_Y;                // 322
-const HORIZONTAL_BAR_Y = 290 + CHART_Y_OFFSET;   // 402
-const TRUNK_BOT_Y    = HORIZONTAL_BAR_Y;
-
-// Directs row (level 2)
-const DIRECT_W      = 380;
-const DIRECT_H      = 110;
-const DIRECT_TOP_Y  = 360 + CHART_Y_OFFSET;      // 472
-const DIRECT_BOT_Y  = DIRECT_TOP_Y + DIRECT_H;   // 582
-// 3 directs evenly spread across the canvas with generous edge margins
-const DIRECT_CXS = [320, 960, 1600] as const;
-
-// Sub trunk from each direct down to its first sub
-const SUB_TRUNK_TOP_Y = DIRECT_BOT_Y;            // 582
-const SUB_ROW_1_Y     = 560 + CHART_Y_OFFSET;    // 672
-const SUB_ROW_2_Y     = 760 + CHART_Y_OFFSET;    // 872
-
-// Sub cards (level 3) — two per direct, stacked vertically below
-const SUB_W   = 360;
-const SUB_H   = 95;
-const SUB_GAP = 25;     // gap between sub cards in a column
-// Sub Y positions: stacked
-const SUB_1_TOP = SUB_ROW_1_Y;                   // 672
-const SUB_1_BOT = SUB_1_TOP + SUB_H;             // 767
-const SUB_2_TOP = SUB_1_BOT + SUB_GAP;           // 792
-const SUB_2_BOT = SUB_2_TOP + SUB_H;             // 887
-
-// Avatars
-const AVATAR_CEO    = 72;
-const AVATAR_DIRECT = 64;
-const AVATAR_SUB    = 56;
-
-// Card padding (between avatar and right edge)
-const CARD_PAD     = 18;
-const AVATAR_RIGHT_PAD = 16;
-
-// Connector styling
-const CONNECTOR_COLOR  = 'rgba(11,30,51,0.30)';  // soft oxford on platinum
-const CONNECTOR_WIDTH  = 2.5;
+// Vertical layout — the whole stack is centred in the canvas; the per-row
+// pitch adapts to the row count (roomier for few rows, tighter for many).
+const V_MARGIN   = 72;
+const PITCH_MIN  = 142;
+const PITCH_MAX  = 232;
+const DROP_ABOVE = 28; // distance from a row's connector bar to its box tops
 
 // ─── Animation timings ───────────────────────────────────────────────────────
 
@@ -151,63 +104,37 @@ const FPS = 30;
 const f = (s: number) => Math.round(s * FPS);
 
 const DEFAULT_TIMINGS = {
-  ceoStart:         0.10,
-  ceoDuration:      0.75,
-  trunkOffset:      0.55,   // delay after CEO start before trunk lines draw
-  trunkDuration:    0.90,
-  directsStart:     1.55,
-  directsStagger:   0.18,
-  directsDuration:  0.70,
-  subTrunkOffset:   2.40,   // absolute time the vertical sub trunks start drawing
-  subTrunkDuration: 0.70,
-  subsStart:        2.85,
-  subsRowStagger:   0.45,   // gap between row 1 and row 2
-  subsColStagger:   0.15,   // gap between cards within a row (across branches)
-  subsDuration:     0.65,
+  topStart:          0.10,
+  topDuration:       0.60,
+  rowsStart:         0.90,
+  rowStagger:        0.90,
+  connectorDuration: 0.60,
+  boxStagger:        0.10,
+  boxDuration:       0.55,
 } as const;
 
 const easeOutCubic         = Easing.out(Easing.cubic);
 const easeInOutCubic       = Easing.inOut(Easing.cubic);
-const easeOutBackSubtle    = Easing.out(Easing.back(1.1));
 const easeOutBackOvershoot = Easing.out(Easing.back(1.3));
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 
 const BG_COLOR = '#E6ECF2';
 
-// CEO — deep oxford → near-black
-const CEO_BG =
+// Top — deep oxford → near-black
+const TOP_BG =
   'linear-gradient(135deg, #0a3050 0%, #052438 50%, #02101c 100%)';
-// Directs — dodger blue
-const DIRECT_BG =
+// Lower boxes — dodger blue
+const BOX_BG =
   'linear-gradient(135deg, #38AEFF 0%, #1A9CFE 50%, #0686EE 100%)';
-// Subs — lighter dodger blue
-const SUB_BG =
-  'linear-gradient(135deg, #7CC7FF 0%, #38AEFF 50%, #1A9CFE 100%)';
 
 const CARD_BORDER = '1px solid rgba(255,255,255,0.08)';
 const CARD_SHADOW = '0 10px 26px rgba(5,36,56,0.20)';
 
-// Default avatar — oxford-blue → near-black sphere with a WHITE icon. Used
-// by directs and subs (sits as a dark badge inside the dodger card).
-const AVATAR_BG =
-  'radial-gradient(circle at 32% 28%, #1a4870 0%, #0a3050 32%, #052438 62%, #02101c 100%)';
-const AVATAR_SHADOW =
-  'inset 0 -3px 6px rgba(0,0,0,0.45), ' +
-  'inset 3px 3px 6px rgba(255,255,255,0.08), ' +
-  '0 2px 6px rgba(5,36,56,0.20)';
+const TEXT_WHITE = '#FFFFFF';
 
-// CEO avatar — dodger-blue sphere with a WHITE icon, so it pops against the
-// dark oxford-blue CEO card.
-const CEO_AVATAR_BG =
-  'radial-gradient(circle at 32% 28%, #7CC7FF 0%, #2EA3FE 32%, #0A8AEF 62%, #005EAA 100%)';
-const CEO_AVATAR_SHADOW =
-  'inset 0 -3px 6px rgba(0,40,90,0.30), ' +
-  'inset 4px 4px 8px rgba(255,255,255,0.18), ' +
-  '0 2px 6px rgba(5,36,56,0.20)';
-
-const TEXT_WHITE       = '#FFFFFF';
-const TEXT_WHITE_DIM   = 'rgba(255,255,255,0.72)';
+const CONNECTOR_COLOR = 'rgba(11,30,51,0.30)';
+const CONNECTOR_WIDTH = 2.5;
 
 // ─── Font loading ────────────────────────────────────────────────────────────
 
@@ -228,21 +155,19 @@ function loadFonts(): Promise<void> {
   return fontsPromise;
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-type CardLevel = 'ceo' | 'direct' | 'sub';
+// ─── Box (single label, scale-in entry) ──────────────────────────────────────
 
-function Card({
-  level, x, y, width, height, name, position,
-  frame, startF, durF,
+function LabelBox({
+  isTop, cx, top, width, height, label, frame, startF, durF,
 }: {
-  level: CardLevel;
-  x: number;
-  y: number;
+  isTop: boolean;
+  cx: number;       // horizontal centre
+  top: number;      // top Y
   width: number;
   height: number;
-  name: string;
-  position: string;
+  label: string;
   frame: number;
   startF: number;
   durF: number;
@@ -250,7 +175,6 @@ function Card({
   const local = frame - startF;
   if (local < 0) return null;
 
-  // Card entry: subtle scale-up with back overshoot + small downward slide.
   const scale = interpolate(local, [0, durF], [0.88, 1.0], {
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOutBackOvershoot,
   });
@@ -261,18 +185,12 @@ function Card({
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOutCubic,
   });
 
-  const cardBg     = level === 'ceo' ? CEO_BG : level === 'direct' ? DIRECT_BG : SUB_BG;
-  const avatarSize = level === 'ceo' ? AVATAR_CEO : level === 'direct' ? AVATAR_DIRECT : AVATAR_SUB;
-  const nameSize   = level === 'ceo' ? 28 : level === 'direct' ? 24 : 21;
-  const posSize    = level === 'ceo' ? 18 : level === 'direct' ? 16 : 15;
-  const radius     = level === 'ceo' ? 20 : 18;
-
   return (
     <div
       style={{
         position: 'absolute',
-        left: x,
-        top:  y,
+        left: cx - width / 2,
+        top,
         width,
         height,
         transform: `translateY(${dy}px) scale(${scale})`,
@@ -280,89 +198,53 @@ function Card({
         opacity: op,
       }}
     >
-      {/* Card surface */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          borderRadius: radius,
-          background: cardBg,
+          borderRadius: isTop ? 20 : 18,
+          background: isTop ? TOP_BG : BOX_BG,
           border: CARD_BORDER,
           boxShadow: CARD_SHADOW,
         }}
       />
-      {/* Content row: avatar + name/position */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
           display: 'flex',
           alignItems: 'center',
-          padding: `0 ${CARD_PAD}px`,
-          gap: AVATAR_RIGHT_PAD,
+          justifyContent: 'center',
+          padding: '10px 20px',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
         }}
       >
-        <div
+        <span
           style={{
-            flex: `0 0 ${avatarSize}px`,
-            width: avatarSize,
-            height: avatarSize,
-            borderRadius: '50%',
-            background: level === 'ceo' ? CEO_AVATAR_BG : AVATAR_BG,
-            boxShadow: level === 'ceo' ? CEO_AVATAR_SHADOW : AVATAR_SHADOW,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            // Fill the available width and wrap to as many lines as needed so a
+            // long label never spills outside the box — long unbreakable words
+            // are broken too. Clamped to 3 lines (which fits the box height) as
+            // a safety net for extreme strings.
+            width: '100%',
+            color: TEXT_WHITE,
+            fontFamily: "'Satoshi', system-ui, sans-serif",
+            fontWeight: isTop ? 900 : 700,
+            fontSize: isTop ? 30 : 26,
+            letterSpacing: '-0.012em',
+            lineHeight: 1.15,
+            textAlign: 'center',
+            whiteSpace: 'normal',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-word',
+            display: '-webkit-box',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: 3,
             overflow: 'hidden',
           }}
         >
-          <Img
-            src={staticFile('icons/user-white.svg')}
-            alt=""
-            style={{ width: avatarSize * 0.62, height: avatarSize * 0.62, display: 'block' }}
-          />
-        </div>
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            gap: 4,
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              color: TEXT_WHITE,
-              fontFamily: "'Satoshi', system-ui, sans-serif",
-              fontWeight: level === 'ceo' ? 900 : 700,
-              fontSize: nameSize,
-              letterSpacing: '-0.012em',
-              lineHeight: 1.1,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {name}
-          </div>
-          <div
-            style={{
-              color: TEXT_WHITE_DIM,
-              fontFamily: "'Satoshi', system-ui, sans-serif",
-              fontWeight: 500,
-              fontSize: posSize,
-              letterSpacing: '-0.005em',
-              lineHeight: 1.25,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {position}
-          </div>
-        </div>
+          {label}
+        </span>
       </div>
     </div>
   );
@@ -370,11 +252,11 @@ function Card({
 
 // Animated line (stroke-dashoffset draw-on).
 function AnimLine({
-  x1, y1, x2, y2, length, progress,
+  x1, y1, x2, y2, progress,
 }: {
-  x1: number; y1: number; x2: number; y2: number;
-  length: number; progress: number;
+  x1: number; y1: number; x2: number; y2: number; progress: number;
 }) {
+  const length = Math.hypot(x2 - x1, y2 - y1);
   return (
     <line
       x1={x1} y1={y1} x2={x2} y2={y2}
@@ -382,16 +264,21 @@ function AnimLine({
       strokeWidth={CONNECTOR_WIDTH}
       strokeLinecap="round"
       strokeDasharray={length}
-      strokeDashoffset={length * (1 - progress)}
+      strokeDashoffset={length * (1 - clamp01(progress))}
     />
   );
 }
 
-function clamp01(x: number): number { return Math.max(0, Math.min(1, x)); }
+// Horizontal centres for a row of n boxes, centred on the canvas.
+function rowCentres(n: number): number[] {
+  const groupW = n * BOX_W + (n - 1) * H_GAP;
+  const firstCx = CANVAS_W / 2 - groupW / 2 + BOX_W / 2;
+  return Array.from({ length: n }, (_, i) => firstCx + i * (BOX_W + H_GAP));
+}
 
 // ─── Main scene ──────────────────────────────────────────────────────────────
 
-export const OrgChart: React.FC<OrgChartProps> = ({ ceo, branches, timings }) => {
+export const OrgChart: React.FC<OrgChartProps> = ({ top, rows, timings }) => {
   const frame = useCurrentFrame();
 
   const [handle] = useState(() => delayRender('Loading OrgChart fonts'));
@@ -402,157 +289,119 @@ export const OrgChart: React.FC<OrgChartProps> = ({ ceo, branches, timings }) =>
   }, [handle]);
 
   const t = { ...DEFAULT_TIMINGS, ...timings };
-  const CEO_START          = f(t.ceoStart);
-  const CEO_DUR            = f(t.ceoDuration);
-  const TRUNK_START        = CEO_START + f(t.trunkOffset);
-  const TRUNK_DUR          = f(t.trunkDuration);
-  const DIRECTS_START      = f(t.directsStart);
-  const DIRECTS_STAG       = f(t.directsStagger);
-  const DIRECTS_DUR        = f(t.directsDuration);
-  const SUB_TRUNK_START    = f(t.subTrunkOffset);
-  const SUB_TRUNK_DUR      = f(t.subTrunkDuration);
-  const SUBS_START         = f(t.subsStart);
-  const SUBS_ROW_STAG      = f(t.subsRowStagger);
-  const SUBS_COL_STAG      = f(t.subsColStagger);
-  const SUBS_DUR           = f(t.subsDuration);
+  const TOP_START  = f(t.topStart);
+  const TOP_DUR    = f(t.topDuration);
+  const ROWS_START = f(t.rowsStart);
+  const ROW_STAG   = f(t.rowStagger);
+  const CONN_DUR   = f(t.connectorDuration);
+  const BOX_STAG   = f(t.boxStagger);
+  const BOX_DUR    = f(t.boxDuration);
 
-  // ─── Connector progress ────────────────────────────────────────────────────
-  // 1. Vertical trunk from CEO down to the horizontal bar
-  // 2. Horizontal bar across to the leftmost and rightmost direct
-  // 3. Short verticals from the bar down to each direct's top
-  // Drawing budget is split: 30 % vertical, 50 % horizontal, 20 % directs verticals
-  const trunkLocal = frame - TRUNK_START;
-  const trunkProg  = clamp01(trunkLocal / TRUNK_DUR);
-  const trunkVerticalP = clamp01(trunkProg / 0.30);
-  const trunkHorizontalP = clamp01((trunkProg - 0.30) / 0.50);
-  const trunkDropsP = clamp01((trunkProg - 0.80) / 0.20);
+  // ─── Vertical layout (auto-centred, adaptive pitch) ────────────────────────
+  const T      = 1 + rows.length;                       // total rows incl. top
+  const avail  = CANVAS_H - 2 * V_MARGIN;
+  const pitch  = T > 1
+    ? Math.max(PITCH_MIN, Math.min(PITCH_MAX, (avail - BOX_H) / (T - 1)))
+    : 0;
+  const stackH = (T - 1) * pitch + BOX_H;
+  const topY   = (CANVAS_H - stackH) / 2;
+  const rowTopY = (r: number) => topY + r * pitch;      // r: 0 = top, 1..R rows
 
-  // Geometry derived
-  const trunkVerticalLen = HORIZONTAL_BAR_Y - TRUNK_TOP_Y;
-  const horizontalBarLen = DIRECT_CXS[2]! - DIRECT_CXS[0]!;
-  const directDropLen    = DIRECT_TOP_Y - HORIZONTAL_BAR_Y;
-
-  // Sub trunks: from each direct's bottom down past sub 1 to sub 2 bottom.
-  // Use one continuous vertical line per branch, plus tiny horizontal nubs
-  // implied by the visual proximity. We just draw the long vertical and
-  // let the sub cards sit on top.
-  const subTrunkLocal = frame - SUB_TRUNK_START;
-  const subTrunkP     = clamp01(subTrunkLocal / SUB_TRUNK_DUR);
-  const subTrunkLen   = SUB_2_TOP - SUB_TRUNK_TOP_Y;  // covers from direct bottom to top of sub 2
+  // ─── Per-row geometry ──────────────────────────────────────────────────────
+  const rowGeom = rows.map((row, idx) => {
+    const r       = idx + 1;                            // 1-based row position
+    const centres = rowCentres(row.length);
+    const boxTop  = rowTopY(r);
+    const barY    = boxTop - DROP_ABOVE;
+    const rowBase = ROWS_START + idx * ROW_STAG;
+    const prevBottom = idx === 0
+      ? rowTopY(0) + BOX_H                              // bottom of the top box
+      : rowTopY(r - 1) + BOX_H;                         // bottom of the row above
+    return { row, centres, boxTop, barY, rowBase, prevBottom };
+  });
 
   return (
     <AbsoluteFill style={{ background: BG_COLOR, overflow: 'hidden' }}>
-      {/* Connector lines */}
+      {/* Connectors: central spine + per-row bars + drops, behind the boxes. */}
       <svg
         width={CANVAS_W}
         height={CANVAS_H}
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
       >
-        {/* 1. Vertical trunk from CEO bottom to the horizontal bar */}
-        <AnimLine
-          x1={CEO_CX} y1={TRUNK_TOP_Y}
-          x2={CEO_CX} y2={HORIZONTAL_BAR_Y}
-          length={trunkVerticalLen}
-          progress={easeInOutCubic(trunkVerticalP)}
-        />
-        {/* 2. Horizontal bar — drawn from the centre outward (we render it
-              as two lines emanating from the centre for a nice "expand"). */}
-        <AnimLine
-          x1={CEO_CX} y1={HORIZONTAL_BAR_Y}
-          x2={DIRECT_CXS[0]!} y2={HORIZONTAL_BAR_Y}
-          length={CEO_CX - DIRECT_CXS[0]!}
-          progress={easeInOutCubic(trunkHorizontalP)}
-        />
-        <AnimLine
-          x1={CEO_CX} y1={HORIZONTAL_BAR_Y}
-          x2={DIRECT_CXS[2]!} y2={HORIZONTAL_BAR_Y}
-          length={DIRECT_CXS[2]! - CEO_CX}
-          progress={easeInOutCubic(trunkHorizontalP)}
-        />
-        {/* 3. Three vertical drops from the bar to each direct's top */}
-        {DIRECT_CXS.map((cx, i) => (
-          <AnimLine
-            key={`drop-${i}`}
-            x1={cx} y1={HORIZONTAL_BAR_Y}
-            x2={cx} y2={DIRECT_TOP_Y}
-            length={directDropLen}
-            progress={easeInOutCubic(trunkDropsP)}
-          />
-        ))}
-
-        {/* Sub trunks — one vertical line per branch from direct's bottom
-            down through both sub positions. */}
-        {DIRECT_CXS.map((cx, i) => (
-          <AnimLine
-            key={`subtrunk-${i}`}
-            x1={cx} y1={SUB_TRUNK_TOP_Y}
-            x2={cx} y2={SUB_2_TOP}
-            length={subTrunkLen}
-            progress={easeInOutCubic(subTrunkP)}
-          />
-        ))}
+        {rowGeom.map((g, idx) => {
+          const cp     = clamp01((frame - g.rowBase) / CONN_DUR);
+          const spineP = clamp01(cp / 0.4);
+          const barP   = clamp01((cp - 0.3) / 0.4);
+          const dropP  = clamp01((cp - 0.6) / 0.4);
+          const minCx  = g.centres[0]!;
+          const maxCx  = g.centres[g.centres.length - 1]!;
+          return (
+            <React.Fragment key={`conn-${idx}`}>
+              {/* Spine segment from the row above down to this row's bar */}
+              <AnimLine
+                x1={CANVAS_W / 2} y1={g.prevBottom}
+                x2={CANVAS_W / 2} y2={g.barY}
+                progress={easeInOutCubic(spineP)}
+              />
+              {/* Horizontal bar across this row (only if more than one box) */}
+              {g.centres.length > 1 && (
+                <>
+                  <AnimLine
+                    x1={CANVAS_W / 2} y1={g.barY}
+                    x2={minCx}        y2={g.barY}
+                    progress={easeInOutCubic(barP)}
+                  />
+                  <AnimLine
+                    x1={CANVAS_W / 2} y1={g.barY}
+                    x2={maxCx}        y2={g.barY}
+                    progress={easeInOutCubic(barP)}
+                  />
+                </>
+              )}
+              {/* Short drop from the bar down to each box top */}
+              {g.centres.map((cx, i) => (
+                <AnimLine
+                  key={`drop-${idx}-${i}`}
+                  x1={cx} y1={g.barY}
+                  x2={cx} y2={g.boxTop}
+                  progress={easeInOutCubic(dropP)}
+                />
+              ))}
+            </React.Fragment>
+          );
+        })}
       </svg>
 
-      {/* CEO card */}
-      <Card
-        level="ceo"
-        x={CEO_LEFT}
-        y={CEO_TOP_Y}
-        width={CEO_W}
-        height={CEO_H}
-        name={ceo.name}
-        position={ceo.position}
+      {/* Top box */}
+      <LabelBox
+        isTop
+        cx={CANVAS_W / 2}
+        top={rowTopY(0)}
+        width={TOP_BOX_W}
+        height={BOX_H}
+        label={top}
         frame={frame}
-        startF={CEO_START}
-        durF={CEO_DUR}
+        startF={TOP_START}
+        durF={TOP_DUR}
       />
 
-      {/* Directs row */}
-      {branches.map((branch, i) => (
-        <Card
-          key={`direct-${i}`}
-          level="direct"
-          x={DIRECT_CXS[i]! - DIRECT_W / 2}
-          y={DIRECT_TOP_Y}
-          width={DIRECT_W}
-          height={DIRECT_H}
-          name={branch.direct.name}
-          position={branch.direct.position}
-          frame={frame}
-          startF={DIRECTS_START + i * DIRECTS_STAG}
-          durF={DIRECTS_DUR}
-        />
-      ))}
-
-      {/* Subs — row 1, then row 2, each branch staggered */}
-      {branches.map((branch, branchIdx) => (
-        <React.Fragment key={`subs-${branchIdx}`}>
-          <Card
-            level="sub"
-            x={DIRECT_CXS[branchIdx]! - SUB_W / 2}
-            y={SUB_1_TOP}
-            width={SUB_W}
-            height={SUB_H}
-            name={branch.subs[0]!.name}
-            position={branch.subs[0]!.position}
+      {/* Rows of boxes */}
+      {rowGeom.map((g, idx) =>
+        g.row.map((label, i) => (
+          <LabelBox
+            key={`box-${idx}-${i}`}
+            isTop={false}
+            cx={g.centres[i]!}
+            top={g.boxTop}
+            width={BOX_W}
+            height={BOX_H}
+            label={label}
             frame={frame}
-            startF={SUBS_START + branchIdx * SUBS_COL_STAG}
-            durF={SUBS_DUR}
+            startF={g.rowBase + CONN_DUR * 0.55 + i * BOX_STAG}
+            durF={BOX_DUR}
           />
-          <Card
-            level="sub"
-            x={DIRECT_CXS[branchIdx]! - SUB_W / 2}
-            y={SUB_2_TOP}
-            width={SUB_W}
-            height={SUB_H}
-            name={branch.subs[1]!.name}
-            position={branch.subs[1]!.position}
-            frame={frame}
-            startF={SUBS_START + SUBS_ROW_STAG + branchIdx * SUBS_COL_STAG}
-            durF={SUBS_DUR}
-          />
-        </React.Fragment>
-      ))}
+        )),
+      )}
     </AbsoluteFill>
   );
 };
@@ -560,28 +409,10 @@ export const OrgChart: React.FC<OrgChartProps> = ({ ceo, branches, timings }) =>
 // ─── Demo / test props ───────────────────────────────────────────────────────
 
 export const orgChartDefaultProps: OrgChartProps = {
-  ceo: { name: 'Alex Morgan',    position: 'Chief Executive Officer' },
-  branches: [
-    {
-      direct: { name: 'Priya Shah',  position: 'VP, Product' },
-      subs: [
-        { name: 'Daniel Reyes',  position: 'Product Lead, AI' },
-        { name: 'Hannah Lin',    position: 'Product Lead, Platform' },
-      ],
-    },
-    {
-      direct: { name: 'Marcus Cole', position: 'VP, Engineering' },
-      subs: [
-        { name: 'Sophie Karam',  position: 'Eng Manager, Infra' },
-        { name: 'Theo Park',     position: 'Eng Manager, Apps' },
-      ],
-    },
-    {
-      direct: { name: 'Elena Rossi', position: 'VP, Design' },
-      subs: [
-        { name: 'Noor Khan',     position: 'Design Lead, Brand' },
-        { name: 'Jamie Wright',  position: 'Design Lead, Product' },
-      ],
-    },
+  top: 'Executive Office',
+  rows: [
+    ['Product', 'Engineering', 'Design', 'Operations'],
+    ['Research', 'Platform', 'Brand'],
+    ['AI Lab', 'Infrastructure', 'Web', 'Mobile'],
   ],
 };
