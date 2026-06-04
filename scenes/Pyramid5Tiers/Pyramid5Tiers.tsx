@@ -13,10 +13,11 @@ import { z } from 'zod';
 
 // Pyramid5Tiers — left-side pyramid + right-side banner stack.
 //   • Platinum-blue (#E6ECF2) canvas.
-//   • Pyramid on the LEFT — 5 stacked dodger-blue trapezoid slabs, centred
-//     on a vertical axis at x≈480. Tier widths grow toward the base so the
-//     outline reads as a smooth triangle.
-//   • Each slab carries a white lucide-style stroke icon.
+//   • Pyramid on the LEFT — 2 to 5 stacked dodger-blue trapezoid slabs,
+//     centred on a vertical axis at x≈480. The triangular envelope is fixed;
+//     however many tiers you supply divide it evenly, so widths always grow
+//     toward the base and the outline reads as a smooth triangle.
+//   • Each slab carries a white Small-Icons stroke icon.
 //   • For every tier, an oxford-blue ROUNDED BANNER sits to the right of
 //     the pyramid carrying a Title (dodger-blue Satoshi Bold) + Body
 //     (white Satoshi Medium). Banners are widest at the top and narrowest
@@ -31,6 +32,8 @@ import { z } from 'zod';
 export const pyramid5TiersTierSchema = z.object({
   title: z.string().min(1).max(22),
   body:  z.string().min(1).max(180),     // wraps to 2–4 lines depending on banner width
+  // Small-Icons id — resolves to small-icons/<id>.svg. Those SVGs are
+  // pre-coloured white and read cleanly on the dodger-blue slab.
   icon:  z.string().min(1),
 });
 
@@ -57,8 +60,9 @@ export const pyramid5TiersTimingsSchema = z
   .partial();
 
 export const pyramid5TiersSchema = z.object({
-  // 5 tiers, TOP → BOTTOM order. Top tier sits at the pyramid's apex.
-  tiers:   z.array(pyramid5TiersTierSchema).length(5),
+  // 2–5 tiers, TOP → BOTTOM order. Top tier sits at the pyramid's apex; the
+  // triangular envelope is divided evenly by however many tiers you supply.
+  tiers:   z.array(pyramid5TiersTierSchema).min(2).max(5),
   timings: pyramid5TiersTimingsSchema.optional(),
 });
 
@@ -70,17 +74,19 @@ export const pyramid5TiersMeta = {
     'an icon, connected to an oxford-blue banner on the right carrying a ' +
     'Title and Body. Use for hierarchies, product stacks, layered concepts.',
   authoringNotes:
-    'Supply exactly 5 tiers in top-to-bottom order. title ≤22 chars ' +
-    '(dodger-blue Satoshi Bold inside the banner). body ≤180 chars — wraps ' +
-    'to multiple lines; allow longer copy on top tiers (wider banner) and ' +
-    'shorter on the bottom (narrowest slab). icon is the lucide-style SVG id ' +
-    'shown inside the slab. Aim for a tier hierarchy that reads from broadest ' +
-    'at top to most specific at bottom (or reverse, depending on framing). ' +
-    'GOOD title: "Strategy", "Tools", "Code", "Data", "Infra". BAD title: ' +
-    '"Strategic planning layer that governs everything" (too long). Bundled ' +
-    'icons: trophy, monitor, cpu, settings, database. Recommended duration ' +
-    '~13 s (390 frames) to let the full highlight cycle play out — at 10 s ' +
-    'only the first ~3 tiers highlight.',
+    'Supply 2 to 5 tiers in top-to-bottom order — the triangular envelope is ' +
+    'fixed and divides evenly, so fewer tiers simply means taller, broader ' +
+    'slabs. title ≤22 chars (dodger-blue Satoshi Bold inside the banner). ' +
+    'body ≤180 chars — wraps to multiple lines; allow longer copy on top ' +
+    'tiers (wider banner) and shorter on the bottom (narrowest slab). icon is ' +
+    'a Small-Icons id (pre-coloured white, e.g. benefit-hand, graduation-cap, ' +
+    'arrow-trend-up, user, search). Aim for a tier hierarchy that reads from ' +
+    'broadest at top to most specific at bottom (or reverse, depending on ' +
+    'framing). GOOD title: "Strategy", "Tools", "Code", "Data", "Infra". BAD ' +
+    'title: "Strategic planning layer that governs everything" (too long). ' +
+    'Recommended duration scales with tier count (~2.5 s per tier plus a ' +
+    'short tail) so the full highlight cycle plays out — e.g. ~13 s for 5 ' +
+    'tiers, ~8 s for 3.',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -94,28 +100,36 @@ const SATOSHI_MEDIUM_SRC  = staticFile('fonts/Satoshi-Medium.woff2');
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
-// Pyramid geometry — 5 tiers, each 195 px tall. Apex sits at the top of
-// the canvas; base half-width = 430 → smooth wide pyramid.
+// Pyramid geometry — the triangular envelope is FIXED (apex at top, base
+// half-width = 430 near the canvas bottom). However many tiers are supplied
+// (2–5) divide that fixed height evenly, so the slope never changes.
 const APEX_X            = 480;
 const APEX_Y            = 50;
-const TIER_HEIGHT       = 195;
 const BASE_HALF_WIDTH   = 430;
-const PYRAMID_HEIGHT    = TIER_HEIGHT * 5;             // 975
+const PYRAMID_HEIGHT    = 975;                        // fixed envelope height
 const BASE_Y            = APEX_Y + PYRAMID_HEIGHT;     // 1025
 const PYRAMID_SLOPE     = BASE_HALF_WIDTH / PYRAMID_HEIGHT;  // ≈ 0.441
 
-// Tier geometry helpers (i = 0..4, top → bottom)
-function tierTopY(i: number):     number { return APEX_Y + i * TIER_HEIGHT; }
-function tierBottomY(i: number):  number { return APEX_Y + (i + 1) * TIER_HEIGHT; }
-function tierCenterY(i: number):  number { return APEX_Y + (i + 0.5) * TIER_HEIGHT; }
+// Per-render tier height: the fixed envelope split across `count` tiers.
+function tierHeight(count: number): number { return PYRAMID_HEIGHT / count; }
+
+// Tier geometry helpers (i = 0..count-1, top → bottom)
+function tierTopY(i: number, count: number):     number { return APEX_Y + i * tierHeight(count); }
+function tierBottomY(i: number, count: number):  number { return APEX_Y + (i + 1) * tierHeight(count); }
+function tierCenterY(i: number, count: number):  number { return APEX_Y + (i + 0.5) * tierHeight(count); }
 function halfWidthAtY(y: number): number { return (y - APEX_Y) * PYRAMID_SLOPE; }
 
+// Icon size scales gently with tier height so it stays balanced whether the
+// pyramid has 5 thin tiers or 2 tall ones. Clamped to a sensible range.
+function iconSizeFor(count: number): number {
+  return Math.max(56, Math.min(120, Math.round(tierHeight(count) * 0.30)));
+}
+
 // Icon position inside each tier — slightly below the centre of the
-// trapezoid so the wider lower section gives it horizontal room (tier 1 is
-// almost a triangle).
-const ICON_SIZE = 60;
-function iconPosFor(i: number): { x: number; y: number } {
-  return { x: APEX_X, y: tierTopY(i) + TIER_HEIGHT * 0.62 };
+// trapezoid so the wider lower section gives it horizontal room (the apex
+// tier is almost a triangle).
+function iconPosFor(i: number, count: number): { x: number; y: number } {
+  return { x: APEX_X, y: tierTopY(i, count) + tierHeight(count) * 0.62 };
 }
 
 // Banner geometry — sits to the right of the pyramid, separated by a small
@@ -129,18 +143,18 @@ const BANNER_PAD_X      = 32;       // horizontal padding inside the banner
 const TITLE_BLOCK_WIDTH = 200;      // reserved width for title on the left of body
 const TITLE_BODY_GAP    = 28;
 
-function bannerLeftXFor(i: number): number {
-  return APEX_X + halfWidthAtY(tierBottomY(i)) + BANNER_GAP;
+function bannerLeftXFor(i: number, count: number): number {
+  return APEX_X + halfWidthAtY(tierBottomY(i, count)) + BANNER_GAP;
 }
-function bannerTopYFor(i: number):  number { return tierTopY(i) + BANNER_INSET_Y; }
-function bannerBotYFor(i: number):  number { return tierBottomY(i) - BANNER_INSET_Y; }
-function bannerWidthFor(i: number): number { return BANNER_RIGHT_X - bannerLeftXFor(i); }
-function bannerHeightFor():         number { return TIER_HEIGHT - 2 * BANNER_INSET_Y; }
+function bannerTopYFor(i: number, count: number):  number { return tierTopY(i, count) + BANNER_INSET_Y; }
+function bannerBotYFor(i: number, count: number):  number { return tierBottomY(i, count) - BANNER_INSET_Y; }
+function bannerWidthFor(i: number, count: number): number { return BANNER_RIGHT_X - bannerLeftXFor(i, count); }
+function bannerHeightFor(count: number):           number { return tierHeight(count) - 2 * BANNER_INSET_Y; }
 
 // SVG path for one trapezoid slab.
-function slabPath(i: number): string {
-  const ty = tierTopY(i);
-  const by = tierBottomY(i);
+function slabPath(i: number, count: number): string {
+  const ty = tierTopY(i, count);
+  const by = tierBottomY(i, count);
   const th = halfWidthAtY(ty);
   const bh = halfWidthAtY(by);
   return [
@@ -189,12 +203,19 @@ const BG_COLOR = '#E6ECF2';
 
 // Five subtle shades of dodger blue, lightest at the apex, deepest at the base.
 const SLAB_GRADIENTS = [
-  ['#7CC7FF', '#1A9CFE'],  // tier 0 (apex) — lightest
+  ['#7CC7FF', '#1A9CFE'],  // lightest (apex end)
   ['#5BB6FF', '#0F95FB'],
   ['#3FA8FB', '#0686EE'],
   ['#1A9CFE', '#0075D8'],
-  ['#0686EE', '#0560A8'],  // tier 4 (base) — deepest
+  ['#0686EE', '#0560A8'],  // deepest (base end)
 ] as const;
+
+// Sample the 5-stop ramp so tier 0 is always lightest and the base tier is
+// always deepest, regardless of how many tiers (2–5) are supplied.
+function slabGradient(i: number, count: number): readonly [string, string] {
+  const idx = count === 1 ? 0 : Math.round((i * (SLAB_GRADIENTS.length - 1)) / (count - 1));
+  return SLAB_GRADIENTS[idx]!;
+}
 
 // Banner — oxford-blue rounded rectangle on the right.
 const BANNER_BG =
@@ -236,9 +257,9 @@ function loadFonts(): Promise<void> {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function Slab({
-  i, frame, startF, durF, highlightStartF, highlightDurF,
+  i, count, frame, startF, durF, highlightStartF, highlightDurF,
 }: {
-  i: number; frame: number; startF: number; durF: number;
+  i: number; count: number; frame: number; startF: number; durF: number;
   highlightStartF: number; highlightDurF: number;
 }) {
   const local = frame - startF;
@@ -251,15 +272,15 @@ function Slab({
   });
   if (local < 0) return null;
 
-  const [topColor, bottomColor] = SLAB_GRADIENTS[i]!;
+  const [topColor, bottomColor] = slabGradient(i, count);
   const gradId      = `slab-grad-${i}`;
   const highlightId = `slab-highlight-${i}`;
-  const path        = slabPath(i);
+  const path        = slabPath(i, count);
 
   // Pivot the scale around the slab's own centre so each tier appears to
   // expand in place rather than slide from the apex.
   const cx = APEX_X;
-  const cy = tierCenterY(i);
+  const cy = tierCenterY(i, count);
 
   // ─── Highlight overlay ───────────────────────────────────────────────
   // Three-stage curve: ease-in 0→1 over the first 20 %, hold at 1 for the
@@ -285,8 +306,8 @@ function Slab({
         <linearGradient
           id={gradId}
           gradientUnits="userSpaceOnUse"
-          x1={cx} y1={tierTopY(i)}
-          x2={cx} y2={tierBottomY(i)}
+          x1={cx} y1={tierTopY(i, count)}
+          x2={cx} y2={tierBottomY(i, count)}
         >
           <stop offset="0%"   stopColor={topColor} />
           <stop offset="100%" stopColor={bottomColor} />
@@ -294,8 +315,8 @@ function Slab({
         <linearGradient
           id={highlightId}
           gradientUnits="userSpaceOnUse"
-          x1={cx} y1={tierTopY(i)}
-          x2={cx} y2={tierBottomY(i)}
+          x1={cx} y1={tierTopY(i, count)}
+          x2={cx} y2={tierBottomY(i, count)}
         >
           <stop offset="0%"   stopColor={HIGHLIGHT_TOP} />
           <stop offset="100%" stopColor={HIGHLIGHT_BOTTOM} />
@@ -309,12 +330,12 @@ function Slab({
       )}
       {/* Bottom divider — thin lighter line at the bottom edge of each slab
           for the stacked-tier read. Skipped on the last tier (no slab below). */}
-      {i < 4 && (
+      {i < count - 1 && (
         <line
-          x1={APEX_X - halfWidthAtY(tierBottomY(i))}
-          y1={tierBottomY(i)}
-          x2={APEX_X + halfWidthAtY(tierBottomY(i))}
-          y2={tierBottomY(i)}
+          x1={APEX_X - halfWidthAtY(tierBottomY(i, count))}
+          y1={tierBottomY(i, count)}
+          x2={APEX_X + halfWidthAtY(tierBottomY(i, count))}
+          y2={tierBottomY(i, count)}
           stroke={SLAB_DIVIDER}
           strokeWidth={1.5}
         />
@@ -324,8 +345,8 @@ function Slab({
 }
 
 function SlabIcon({
-  i, icon, frame, startF, durF,
-}: { i: number; icon: string; frame: number; startF: number; durF: number }) {
+  i, count, icon, frame, startF, durF,
+}: { i: number; count: number; icon: string; frame: number; startF: number; durF: number }) {
   const local = frame - startF;
   const scale = interpolate(local, [0, durF], [0.5, 1.0], {
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOutBackOvershoot,
@@ -335,22 +356,23 @@ function SlabIcon({
   });
   if (local < 0) return null;
 
-  const pos = iconPosFor(i);
+  const pos  = iconPosFor(i, count);
+  const size = iconSizeFor(count);
   return (
     <div
       style={{
         position: 'absolute',
-        left: pos.x - ICON_SIZE / 2,
-        top:  pos.y - ICON_SIZE / 2,
-        width:  ICON_SIZE,
-        height: ICON_SIZE,
+        left: pos.x - size / 2,
+        top:  pos.y - size / 2,
+        width:  size,
+        height: size,
         transform: `scale(${scale})`,
         transformOrigin: 'center center',
         opacity: op,
       }}
     >
       <Img
-        src={staticFile(`icons/${icon}.svg`)}
+        src={staticFile(`small-icons/${icon}.svg`)}
         alt=""
         style={{ width: '100%', height: '100%', display: 'block' }}
       />
@@ -359,13 +381,13 @@ function SlabIcon({
 }
 
 function Banner({
-  i, title, body, frame,
+  i, count, title, body, frame,
   bannerStartF, bannerDurF,
   titleStartF, titleDurF,
   bodyStartF, bodyDurF,
   highlightStartF, highlightDurF,
 }: {
-  i: number; title: string; body: string;
+  i: number; count: number; title: string; body: string;
   frame: number;
   bannerStartF: number; bannerDurF: number;
   titleStartF: number;  titleDurF: number;
@@ -400,10 +422,10 @@ function Banner({
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: easeOutCubic,
   });
 
-  const left   = bannerLeftXFor(i);
-  const top    = bannerTopYFor(i);
-  const width  = bannerWidthFor(i);
-  const height = bannerHeightFor();
+  const left   = bannerLeftXFor(i, count);
+  const top    = bannerTopYFor(i, count);
+  const width  = bannerWidthFor(i, count);
+  const height = bannerHeightFor(count);
 
   // ─── Pulse during the highlight window ──────────────────────────────
   // Subtle scale curve (sin) peaking at the midpoint of the highlight.
@@ -494,6 +516,7 @@ function Banner({
 
 export const Pyramid5Tiers: React.FC<Pyramid5TiersProps> = ({ tiers, timings }) => {
   const frame = useCurrentFrame();
+  const count = tiers.length;
 
   const [handle] = useState(() => delayRender('Loading Pyramid5Tiers fonts'));
   useEffect(() => {
@@ -528,10 +551,11 @@ export const Pyramid5Tiers: React.FC<Pyramid5TiersProps> = ({ tiers, timings }) 
         viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
         style={{ position: 'absolute', inset: 0 }}
       >
-        {[0, 1, 2, 3, 4].map(i => (
+        {tiers.map((_, i) => (
           <Slab
             key={`slab-${i}`}
             i={i}
+            count={count}
             frame={frame}
             startF={INTRO_OFFSET + i * TIER_STAG}
             durF={SLAB_DUR}
@@ -546,6 +570,7 @@ export const Pyramid5Tiers: React.FC<Pyramid5TiersProps> = ({ tiers, timings }) 
         <SlabIcon
           key={`icon-${i}`}
           i={i}
+          count={count}
           icon={tier.icon}
           frame={frame}
           startF={INTRO_OFFSET + i * TIER_STAG + ICON_OFF}
@@ -560,6 +585,7 @@ export const Pyramid5Tiers: React.FC<Pyramid5TiersProps> = ({ tiers, timings }) 
           <Banner
             key={`banner-${i}`}
             i={i}
+            count={count}
             title={tier.title}
             body={tier.body}
             frame={frame}
@@ -585,27 +611,27 @@ export const pyramid5TiersDefaultProps: Pyramid5TiersProps = {
     {
       title: 'Outcomes',
       body:  'What the user actually receives. Value, results, the feeling of progress. Everything below is in service of this.',
-      icon:  'trophy',
+      icon:  'high-five-celebration-yes',
     },
     {
       title: 'UX',
       body:  'Interface and interaction patterns. Where humans meet the machine and decide whether they trust it.',
-      icon:  'monitor',
+      icon:  'ai-assistant',
     },
     {
       title: 'Reasoning',
       body:  'Models, prompts, and chains of thought. The cognitive layer that turns inputs into useful outputs.',
-      icon:  'cpu',
+      icon:  'auto-update',
     },
     {
       title: 'Tools',
       body:  'APIs, functions, retrieval. The machinery the model reaches for.',
-      icon:  'settings',
+      icon:  'layer-plus',
     },
     {
       title: 'Data',
       body:  'Documents, training sets, embeddings. The foundation everything is built on.',
-      icon:  'database',
+      icon:  'add-document',
     },
   ],
 };
