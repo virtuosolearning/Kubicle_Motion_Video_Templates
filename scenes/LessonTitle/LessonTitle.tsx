@@ -49,17 +49,17 @@ export const lessonTitleSchema = z.object({
   // Course name rendered next to the course icon at top-left
   // (e.g. "Excel Fundamentals"). One line only.
   courseTitle: z.string().min(1).max(80),
-  // Short eyebrow above the main title (e.g. "Lesson One"). Rendered in
-  // the accent colour to establish position in the course.
-  lessonLabel: z.string().min(1).max(40),
+  // Lesson number (1-99). The eyebrow ALWAYS renders as
+  // "Lesson <word>" (e.g. 1 → "Lesson One", 7 → "Lesson Seven") to keep
+  // the brand format consistent across courses. Authors only choose the
+  // number — the word form is derived. Numbers above 20 render with
+  // digits ("Lesson 27").
+  lessonNumber: z.number().int().min(1).max(99),
   // The main headline. Allowed to wrap.
   lessonTitle: z.string().min(1).max(120),
-  // Per-course brand override. Validated as a 6-digit hex triple. Falls
-  // back to DEFAULT_ACCENT when absent.
-  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   // Optional URL for the course icon. Rendered as a CSS mask tinted with
-  // accentColor. If the URL is absent or fails to load, the icon slot is
-  // skipped — the course title text still shows.
+  // the brand accent. If the URL is absent or fails to load, the icon
+  // slot is skipped — the course title text still shows.
   courseIconUrl: z.string().url().optional(),
   timings: lessonTitleTimingsSchema.optional(),
 });
@@ -72,14 +72,15 @@ export const lessonTitleMeta = {
     'title (top-left), accent lesson label, big headline, and a brand badge ' +
     'in the bottom-right.',
   authoringNotes:
-    'Use as the first scene of every lesson. courseTitle sits next to the ' +
-    'course icon (top-left); keep it under ~35 chars. lessonLabel is the ' +
-    'eyebrow ("Lesson One", "Chapter 3"). lessonTitle is the headline; aim ' +
-    'for under 60 chars so it lands on one or two lines at 78 px. ' +
-    'accentColor (6-digit hex with #) overrides Dodger Blue per-course; ' +
-    'courseIconUrl should point at a transparent PNG/SVG whose silhouette ' +
-    'gets tinted with accentColor at render time. Default duration 300 ' +
-    'frames (10 s).',
+    'Use as the first scene of every lesson. Three editable fields: ' +
+    'courseTitle (next to the course icon, top-left; keep under ~35 chars), ' +
+    'lessonNumber (an integer 1-99 — the eyebrow ALWAYS renders as ' +
+    '"Lesson <word>"; 1 → "Lesson One", 7 → "Lesson Seven", 27 → ' +
+    '"Lesson 27"), and lessonTitle (the headline; aim for under 60 chars so ' +
+    'it lands on one or two lines at 78 px). The accent colour (Dodger ' +
+    'Blue) is locked. courseIconUrl is optional and points at a ' +
+    'transparent PNG/SVG whose silhouette gets tinted with the accent at ' +
+    'render time. Default duration 300 frames (10 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -94,6 +95,17 @@ const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
 
 const DEFAULT_ACCENT = '#0794FD';
 const TITLE_COLOUR   = '#FFFFFF';
+
+// "Lesson <word>" eyebrow — word form for 1-20, digits for 21+.
+const LESSON_WORDS = [
+  'One',     'Two',       'Three',    'Four',     'Five',
+  'Six',     'Seven',     'Eight',    'Nine',     'Ten',
+  'Eleven',  'Twelve',    'Thirteen', 'Fourteen', 'Fifteen',
+  'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty',
+] as const;
+function lessonLabelFor(n: number): string {
+  return `Lesson ${LESSON_WORDS[n - 1] ?? String(n)}`;
+}
 
 // Logo row.
 const LOGO_X = 77;
@@ -190,14 +202,14 @@ function preloadMaskImage(url: string): Promise<boolean> {
 
 export const LessonTitle: React.FC<LessonTitleProps> = ({
   courseTitle,
-  lessonLabel,
+  lessonNumber,
   lessonTitle,
-  accentColor,
   courseIconUrl,
   timings,
 }) => {
   const frame = useCurrentFrame();
-  const accent = accentColor ?? DEFAULT_ACCENT;
+  const accent = DEFAULT_ACCENT;
+  const lessonLabel = lessonLabelFor(lessonNumber);
 
   const t = { ...DEFAULT_TIMINGS, ...timings };
   const LOGO_IN_START   = f(t.logoInStart);
