@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AbsoluteFill,
   Easing,
@@ -11,26 +11,26 @@ import {
 } from 'remotion';
 import { z } from 'zod';
 
-// Timeline5Tiles — split-screen 5-step list with anchor icon and progress bar.
-//   • Phase 1 (0.00–1.20 s): left icon panel slides in from off-canvas left
-//     (translateX −1100 → 0); right container fades + slides up 30 px.
-//   • Phase 2: 5 steps reveal sequentially. Each step at 1.50 + n × 2.20 s.
-//     Per step:
-//       0.00–0.55 s  numbered circle scales 0 → 1 (easeOutBack subtle, c1=1.05)
-//       0.20–0.60 s  number digit fades in
-//       0.40–1.70 s  step text typewriter character-by-character
-//   • Loading bar fills in 5 segments (20 % per step), each segment animating
-//     during its step's circle scale + typewriter window.
-//   • Default composition length is 450 frames (15 s @ 30 fps). Step 5
-//     finishes around 12.0 s, leaving ~3 s of held composition.
+// Timeline5Tiles — split-screen 1–5 step list with anchor icon/character and a
+// progress bar.
+//   • Left: blue panel with a large white line-art icon OR a full-bleed
+//     character portrait.
+//   • Right: an oxford-blue rounded container that AUTO-SIZES to the number of
+//     steps (1–5) and stays vertically centred, so there is never empty space
+//     below the last step. Each step reveals with a circle pop-in and a single
+//     typewritten phrase; a progress bar beneath fills 1/N per step.
+//   • Phase 1 (0.00–1.20 s): left panel slides in from off-canvas left;
+//     right container fades + slides up 30 px.
+//   • Phase 2: steps reveal sequentially at 1.50 + n × 2.20 s.
+//   • Default composition length is 450 frames (15 s @ 30 fps).
 //
-// Anchor icon (video-lecture.svg) recoloured fully white at port time
-// (Pattern A static patch: both #052438 and #0496FF → #FFFFFF).
+// The left icon is auto-recoloured to solid white, so any line-art SVG from the
+// icon catalogue works without a per-file recolour. Characters come from the
+// shared character library (enum) and render large/bottom-anchored.
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
 // Optional per-render timing overrides. All values in SECONDS.
-// stepTexts must contain exactly 5 entries.
 export const timeline5TilesTimingsSchema = z
   .object({
     splitInStart:    z.number().nonnegative(),
@@ -43,17 +43,44 @@ export const timeline5TilesTimingsSchema = z
   })
   .partial();
 
-// Anchor accepts either an SVG icon or a character portrait PNG. The id is the
-// filename stem (no extension); resolved to icons/<id>.svg or characters/<id>.png.
+// Character library — every PNG in the shared CHARACTER LIBRARY (PNG) set.
+// Swapping a character is just changing its id; all render at one fixed framing.
+export const CHARACTER_IDS = [
+  'Female_middleage_Asian',
+  'female_earlycareer_black',
+  'female_earlycareer_middleeastern',
+  'female_earlycareer_white',
+  'female_earlycareer_white2',
+  'female_earlycareer_white3',
+  'female_midcareer_white',
+  'female_middleage_white',
+  'female_middleage_white2',
+  'female_middleage_white3',
+  'male_earlycareer_black',
+  'male_middleage_asian',
+  'male_middleage_black',
+  'male_middleage_white',
+  'male_middleage_white2',
+  'male_middleage_white3',
+] as const;
+
+export const characterIdSchema = z.enum(CHARACTER_IDS);
+
+// Anchor accepts either an SVG icon or a character portrait PNG.
+//   • icon:      any line-art id from the icon catalogue (resolved to
+//                icons/<id>.svg) — auto-recoloured to solid white.
+//   • character: an id from the character library (resolved to
+//                characters/<id>.png) — rendered large, bottom-anchored.
 export const timeline5TilesAnchorSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('icon'),      id: z.string().min(1) }),
-  z.object({ kind: z.literal('character'), id: z.string().min(1) }),
+  z.object({ kind: z.literal('character'), id: characterIdSchema }),
 ]);
 
 export const timeline5TilesSchema = z.object({
-  // Exactly 5 step lines, ordered top → bottom. Bold white at 37 px in the
-  // Satoshi family. ≤30 chars each so the typewriter completes in 1.3 s.
-  steps: z.array(z.string().min(1).max(30)).length(5),
+  // 1 to 5 step lines, ordered top → bottom. Bold white at 37 px in the
+  // Satoshi family. ≤30 chars each so the typewriter completes in 1.3 s. The
+  // oxford-blue container resizes to fit however many you supply.
+  steps: z.array(z.string().min(1).max(30)).min(1).max(5),
   // Left-panel anchor: icon (line-art SVG) or character (portrait PNG).
   anchor: timeline5TilesAnchorSchema,
   timings: timeline5TilesTimingsSchema.optional(),
@@ -63,74 +90,100 @@ export type Timeline5TilesProps = z.infer<typeof timeline5TilesSchema>;
 
 export const timeline5TilesMeta = {
   description:
-    'Split-screen compact 5-step list. Large white anchor icon on a dark left ' +
-    'panel; on the right a numbered column where each step reveals with a ' +
+    'Split-screen compact 1–5 step list. Large white anchor icon (or a ' +
+    'character portrait) on a blue left panel; on the right an oxford-blue ' +
+    'container that auto-sizes to the number of steps, each revealing with a ' +
     'circle pop-in and a single typewritten phrase, accompanied by a progress ' +
     'bar filling beneath. One line per step, no supporting body copy. Best for ' +
-    'a fast-reading 5-step process where each step is a short imperative ' +
-    'phrase — speed and clarity over narrative detail.',
+    'a fast-reading short process where each step is a short imperative phrase.',
   authoringNotes:
-    'Always supply exactly 5 steps in chronological order. Each is a short ' +
-    'one-line description (Satoshi Bold 37 px white, ≤30 chars). Aim for ' +
-    'parallel imperative phrasing. GOOD: "Plan the project scope". BAD: ' +
-    '"You should plan the project carefully" (too long). anchor is a ' +
-    "discriminated union: { kind: 'icon', id } renders icons/<id>.svg (540×540 " +
-    "line art on the dark left panel); { kind: 'character', id } renders " +
-    'characters/<id>.png fitted to the full panel (object-fit: contain, ' +
-    'bottom-anchored). Use pre-cut PNGs with transparent backgrounds. Default ' +
-    'duration 450 frames (15 s).',
+    'Supply 1 to 5 steps in chronological order. Each is a short one-line ' +
+    'description (Satoshi Bold 37 px white, ≤30 chars). Aim for parallel ' +
+    'imperative phrasing. GOOD: "Plan the project scope". BAD: "You should ' +
+    'plan the project carefully" (too long). The oxford-blue container ' +
+    'auto-sizes and stays vertically centred for whatever count you supply, so ' +
+    '1, 2, 3, 4 or 5 all read with no empty space. anchor is a discriminated ' +
+    "union: { kind: 'icon', id } renders icons/<id>.svg (any line-art id from " +
+    'the icon catalogue) — the icon is auto-recoloured to solid white, so no ' +
+    "pre-whitening is needed; { kind: 'character', id } renders " +
+    'characters/<id>.png from the character library (use a CHARACTER_IDS value) ' +
+    'rendered large and bottom-anchored. Default duration 450 frames (15 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
-const ICON_BASE_SRC      = staticFile('Template-Specific-Assets/icon_base.png');
-const CONTAINER_SRC      = staticFile('Template-Specific-Assets/container_right.png');
-const NUMBER_CIRCLE_SRC  = staticFile('Template-Specific-Assets/number_circle_base.png');
-const LOAD_BAR_BASE_SRC  = staticFile('Template-Specific-Assets/loading_bar_base.png');
-const LOAD_BAR_TOP_SRC   = staticFile('Template-Specific-Assets/loading_bar_top.png');
+const ICON_BASE_SRC       = staticFile('Template-Specific-Assets/icon_base.png');
 const INTER_EXTRABOLD_SRC = staticFile('fonts/Inter-ExtraBold.woff2');
-const SATOSHI_BOLD_SRC    = staticFile('fonts/Satoshi-Bold.woff2');
+const SATOSHI_BOLD_SRC     = staticFile('fonts/Satoshi-Bold.woff2');
 
-// ─── Layout constants (lifted directly from the prototype) ────────────────────
+// ─── Layout constants (1920×1080 canvas) ─────────────────────────────────────
 
-// Icon_Base.png solid bbox: x=0..857, y=50..1020 → centre (428, 535).
+const CANVAS_W = 1920;
+const CANVAS_H = 1080;
+
+// Left icon panel (icon_base.png bbox: x 0..858, y 50..1021 → centre 428, 535).
 const ICON_PANEL_CX = 428;
 const ICON_PANEL_CY = 535;
 const ICON_SIZE     = 540;
 
-// Character bbox — fills the panel (inset slightly from the bbox edges so the
-// subject sits comfortably inside the rounded corners). object-fit: contain
-// keeps the head visible at the top regardless of source aspect.
-const CHAR_LEFT   = 50;
-const CHAR_TOP    = 80;
-const CHAR_WIDTH  = 750;
-const CHAR_HEIGHT = 900;
-const CHAR_RADIUS = 40;
+// Character anchor. Two things to get right:
+//   1. The library PNGs are hard-cropped at the torso (the figure runs to the
+//      very bottom edge of the source). Rendering the portrait LARGER than the
+//      panel and top-anchored pushes that flat cut below the panel, leaving a
+//      clean head-and-shoulders/chest framing.
+//   2. The portrait is matted to the blue panel's exact shape using
+//      icon_base.png's alpha as a CSS mask, so it can never spill past the panel
+//      onto the platinum background (the panel has a large right-corner radius
+//      and a flush left edge — the mask matches it precisely).
+const CHAR_IMG_W    = 1060;                          // portrait size (square)
+const CHAR_IMG_TOP  = 48;                            // portrait top (canvas-y)
+const CHAR_IMG_LEFT = ICON_PANEL_CX - CHAR_IMG_W / 2; // centred on the panel
 
-// Loading bar bbox inside Container_right.png (and Loading_Bar_*.png).
-const LOAD_BAR_LEFT  = 1027;
-const LOAD_BAR_RIGHT = 1737;
+// Right oxford-blue container — horizontal extent fixed; height derived from N.
+const CONTAINER_LEFT   = 944;
+const CONTAINER_W      = 877;
+const CONTAINER_RADIUS = 40;
 
-// Number_Circle_Base.png source bbox: x=996..1121, y=198..323.
-const CIRCLE_LEFT = 996;
-const CIRCLE_TOP  = 198;
-const CIRCLE_W    = 126;
-const CIRCLE_H    = 126;
-const SOURCE_CX = CIRCLE_LEFT + CIRCLE_W / 2;  // 1059
-const SOURCE_CY = CIRCLE_TOP  + CIRCLE_H / 2;  // 261
+// Vertical model inside the container (measured from container top):
+const BAR_FROM_TOP   = 85;     // progress-bar centre
+const ROW0_FROM_TOP  = 215;    // first step's circle centre
+const ROW_PITCH      = 157.25; // centre-to-centre between steps
+const BOTTOM_PAD      = 131;    // below the last step's circle centre
 
-// Final-comp circle row centres.
-const ROW_CYS = [263, 420, 578, 735, 892] as const;
+function containerHeight(n: number): number {
+  return ROW0_FROM_TOP + (n - 1) * ROW_PITCH + BOTTOM_PAD;
+}
+function containerTop(n: number): number {
+  return (CANVAS_H - containerHeight(n)) / 2;
+}
+
+// Progress bar (relative to container left).
+const BAR_LEFT_REL = 83;       // 1027 − CONTAINER_LEFT
+const BAR_WIDTH    = 710;
+const BAR_HEIGHT   = 44;
+
+// Numbered circle.
+const CIRCLE_CX = 1059;
+const CIRCLE_R  = 63;          // diameter 126
 
 // Step text region.
 const TEXT_LEFT  = 1185;
-const TEXT_RIGHT = 1800;
+const TEXT_WIDTH = 615;
 
 // Left panel slides in from this far off-canvas left.
 const PANEL_TRAVEL = 1100;
-
 // Right container's slide-up + fade-up offset.
 const CONTAINER_TY_FROM = 30;
+
+// ─── Palette (sampled from the original prototype PNGs) ──────────────────────
+
+const CONTAINER_BG = 'linear-gradient(180deg, #041E2E 0%, #020D14 100%)';
+// Track is the dodger blue darkened (matches the original base PNG at 50%).
+const BAR_TRACK    = '#024B80';
+// Bar fill + circles share the same top-lit vertical gradient as the source
+// PNGs: light blue at the top falling to dodger blue at the bottom.
+const BAR_FILL     = 'linear-gradient(180deg, #45B1FF 0%, #0496FF 100%)';
+const CIRCLE_BG    = 'linear-gradient(180deg, #5ABAFF 0%, #1A9FFF 52%, #0496FF 100%)';
 
 // ─── Animation timings ────────────────────────────────────────────────────────
 
@@ -142,7 +195,6 @@ const DEFAULT_TIMINGS = {
   splitInDuration: 1.20,
   stepFirstStart:  1.50,
   stepStagger:     2.20,
-  // Per-step (relative to step start):
   circleScaleDuration: 0.55,
   typeStartOffset:     0.40,
   typeDuration:        1.30,
@@ -168,25 +220,26 @@ function loadFonts(): Promise<void> {
   return fontsPromise;
 }
 
-// ─── Loading-bar progress (5 segments, 20 % per step) ────────────────────────
+// ─── Loading-bar progress (N segments, 1/N per step) ─────────────────────────
 // Each segment runs from its step's circle scale start to the moment its
-// typewriter finishes (TYPE_START_OFFSET + TYPE_DURATION window).
+// typewriter finishes (segDuration = typeStartOffset + typeDuration window).
 
 function computeBarProgress(
   frame: number,
   stepFirstStart: number,
   stepStagger: number,
   segDuration: number,
+  n: number,
 ): number {
   if (frame < stepFirstStart) return 0;
-  for (let i = 0; i < 5; i++) {
+  const seg = 1 / n;
+  for (let i = 0; i < n; i++) {
     const segStart = stepFirstStart + i * stepStagger;
     const segEnd   = segStart + segDuration;
-    if (frame < segStart) return i * 0.2;
+    if (frame < segStart) return i * seg;
     if (frame < segEnd) {
       const local = (frame - segStart) / segDuration;
-      const eased = easeInOutCubic(local);
-      return i * 0.2 + eased * 0.2;
+      return i * seg + easeInOutCubic(local) * seg;
     }
   }
   return 1.0;
@@ -246,30 +299,42 @@ function IconPanel({
           <Img
             src={staticFile(`icons/${anchor.id}.svg`)}
             alt=""
-            style={{ width: ICON_SIZE, height: ICON_SIZE }}
+            // Force the line-art icon to solid white regardless of its source
+            // ink, so any catalogue SVG reads correctly on the blue panel
+            // without a per-file recolour. brightness(0) → black, invert(1) → white.
+            style={{
+              width: ICON_SIZE,
+              height: ICON_SIZE,
+              filter: 'brightness(0) invert(1)',
+            }}
           />
         </div>
       ) : (
         <div
           style={{
             position: 'absolute',
-            left: CHAR_LEFT,
-            top:  CHAR_TOP,
-            width:  CHAR_WIDTH,
-            height: CHAR_HEIGHT,
-            borderRadius: CHAR_RADIUS,
-            overflow: 'hidden',
+            inset: 0,
             opacity: iconOp,
+            // Matte the portrait to the blue panel's exact alpha shape.
+            WebkitMaskImage: `url(${ICON_BASE_SRC})`,
+            maskImage:       `url(${ICON_BASE_SRC})`,
+            WebkitMaskSize: `${CANVAS_W}px ${CANVAS_H}px`,
+            maskSize:       `${CANVAS_W}px ${CANVAS_H}px`,
+            WebkitMaskRepeat: 'no-repeat',
+            maskRepeat:       'no-repeat',
+            WebkitMaskPosition: '0px 0px',
+            maskPosition:       '0px 0px',
           }}
         >
           <Img
             src={staticFile(`characters/${anchor.id}.png`)}
             alt=""
             style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              objectPosition: '50% 100%',
+              position: 'absolute',
+              left: CHAR_IMG_LEFT,
+              top:  CHAR_IMG_TOP,
+              width:  CHAR_IMG_W,
+              height: CHAR_IMG_W,
               display: 'block',
             }}
           />
@@ -283,6 +348,9 @@ function RightContainer({
   frame,
   splitStart,
   splitEnd,
+  n,
+  cTop,
+  cHeight,
   stepFirstStart,
   stepStagger,
   segDuration,
@@ -290,6 +358,9 @@ function RightContainer({
   frame: number;
   splitStart: number;
   splitEnd: number;
+  n: number;
+  cTop: number;
+  cHeight: number;
   stepFirstStart: number;
   stepStagger: number;
   segDuration: number;
@@ -305,48 +376,45 @@ function RightContainer({
     easing: easeInOutCubic,
   });
 
-  const fillProg   = computeBarProgress(frame, stepFirstStart, stepStagger, segDuration);
-  const rightInset = (1920 - LOAD_BAR_LEFT) - (LOAD_BAR_RIGHT - LOAD_BAR_LEFT) * fillProg;
+  const fillProg = computeBarProgress(frame, stepFirstStart, stepStagger, segDuration, n);
 
   return (
     <div
       style={{
         position: 'absolute',
-        inset: 0,
+        left: CONTAINER_LEFT,
+        top:  cTop,
+        width:  CONTAINER_W,
+        height: cHeight,
+        borderRadius: CONTAINER_RADIUS,
+        background: CONTAINER_BG,
         opacity: op,
         transform: `translateY(${ty}px)`,
         pointerEvents: 'none',
       }}
     >
-      <Img
-        src={CONTAINER_SRC}
-        alt=""
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
-      />
-      {/* Loading bar BASE — darkened to read as "track" */}
-      <Img
-        src={LOAD_BAR_BASE_SRC}
-        alt=""
+      {/* Progress bar track */}
+      <div
         style={{
           position: 'absolute',
-          inset: 0,
-          width:  '100%',
-          height: '100%',
-          display: 'block',
-          filter: 'brightness(0.50) saturate(0.85)',
+          left: BAR_LEFT_REL,
+          top:  BAR_FROM_TOP - BAR_HEIGHT / 2,
+          width:  BAR_WIDTH,
+          height: BAR_HEIGHT,
+          borderRadius: BAR_HEIGHT / 2,
+          background: BAR_TRACK,
         }}
       />
-      {/* Loading bar TOP — clipped to fill progress */}
-      <Img
-        src={LOAD_BAR_TOP_SRC}
-        alt=""
+      {/* Progress bar fill */}
+      <div
         style={{
           position: 'absolute',
-          inset: 0,
-          width:  '100%',
-          height: '100%',
-          display: 'block',
-          clipPath: `inset(0 ${rightInset}px 0 ${LOAD_BAR_LEFT}px)`,
+          left: BAR_LEFT_REL,
+          top:  BAR_FROM_TOP - BAR_HEIGHT / 2,
+          width:  Math.max(BAR_HEIGHT, BAR_WIDTH * fillProg),
+          height: BAR_HEIGHT,
+          borderRadius: BAR_HEIGHT / 2,
+          background: BAR_FILL,
         }}
       />
     </div>
@@ -358,6 +426,7 @@ function Step({
   frame,
   text,
   startFrame,
+  rowCenterY,
   circleScaleDur,
   typeStartOffset,
   typeDur,
@@ -366,14 +435,13 @@ function Step({
   frame: number;
   text: string;
   startFrame: number;
+  rowCenterY: number;
   circleScaleDur: number;
   typeStartOffset: number;
   typeDur: number;
 }) {
   const localFrame = frame - startFrame;
   if (localFrame < 0) return null;
-
-  const offsetY = ROW_CYS[index]! - ROW_CYS[0];
 
   // Circle scale-in.
   const scaleProg = interpolate(localFrame, [0, circleScaleDur], [0, 1], {
@@ -400,47 +468,37 @@ function Step({
 
   return (
     <>
-      {/* Numbered circle — full-canvas asset translated + scaled around centre */}
+      {/* Numbered circle */}
       <div
         style={{
           position: 'absolute',
-          inset: 0,
-          transform: `translateY(${offsetY}px) scale(${drawScale})`,
-          transformOrigin: `${SOURCE_CX}px ${SOURCE_CY}px`,
+          left: CIRCLE_CX - CIRCLE_R,
+          top:  rowCenterY - CIRCLE_R,
+          width:  CIRCLE_R * 2,
+          height: CIRCLE_R * 2,
+          borderRadius: '50%',
+          background: CIRCLE_BG,
+          transform: `scale(${drawScale})`,
+          transformOrigin: 'center center',
           opacity: scaleProg > 0 ? 1 : 0,
-          pointerEvents: 'none',
-        }}
-      >
-        <Img
-          src={NUMBER_CIRCLE_SRC}
-          alt=""
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        />
-      </div>
-
-      {/* Number digit — flex-centred to the circle bbox */}
-      <div
-        style={{
-          position: 'absolute',
-          left: CIRCLE_LEFT,
-          top:  CIRCLE_TOP + offsetY,
-          width:  CIRCLE_W,
-          height: CIRCLE_H,
           display: 'flex',
           alignItems:     'center',
           justifyContent: 'center',
-          color: '#FFFFFF',
-          fontFamily: "'Inter', system-ui, sans-serif",
-          fontWeight: 800,
-          fontSize: 60,
-          lineHeight: 1,
-          opacity: numberOp,
-          transform: `scale(${drawScale})`,
-          transformOrigin: 'center center',
           pointerEvents: 'none',
         }}
       >
-        {index + 1}
+        <span
+          style={{
+            color: '#FFFFFF',
+            fontFamily: "'Inter', system-ui, sans-serif",
+            fontWeight: 800,
+            fontSize: 60,
+            lineHeight: 1,
+            opacity: numberOp,
+          }}
+        >
+          {index + 1}
+        </span>
       </div>
 
       {/* Step text — typewriter, vertically centred against the circle */}
@@ -448,8 +506,8 @@ function Step({
         style={{
           position: 'absolute',
           left: TEXT_LEFT,
-          top:  ROW_CYS[index],
-          width: TEXT_RIGHT - TEXT_LEFT,
+          top:  rowCenterY,
+          width: TEXT_WIDTH,
           transform: 'translateY(-50%)',
           color: '#FFFFFF',
           fontFamily: "'Satoshi', system-ui, sans-serif",
@@ -491,7 +549,11 @@ export const Timeline5Tiles: React.FC<Timeline5TilesProps> = ({
   const CIRCLE_DUR     = f(t.circleScaleDuration);
   const TYPE_OFFSET    = f(t.typeStartOffset);
   const TYPE_DUR       = f(t.typeDuration);
-  const SEG_DURATION   = TYPE_OFFSET + TYPE_DUR;  // bar advances during this window per step
+  const SEG_DURATION   = TYPE_OFFSET + TYPE_DUR;
+
+  const n      = steps.length;
+  const cHeight = containerHeight(n);
+  const cTop    = containerTop(n);
 
   return (
     <AbsoluteFill style={{ background: '#E6ECF2', overflow: 'hidden' }}>
@@ -506,18 +568,22 @@ export const Timeline5Tiles: React.FC<Timeline5TilesProps> = ({
         frame={frame}
         splitStart={SPLIT_START}
         splitEnd={SPLIT_END}
+        n={n}
+        cTop={cTop}
+        cHeight={cHeight}
         stepFirstStart={STEP_FIRST}
         stepStagger={STEP_STAGGER}
         segDuration={SEG_DURATION}
       />
 
-      {[0, 1, 2, 3, 4].map(i => (
+      {steps.map((text, i) => (
         <Step
           key={i}
           index={i}
           frame={frame}
-          text={steps[i]!}
+          text={text}
           startFrame={STEP_FIRST + i * STEP_STAGGER}
+          rowCenterY={cTop + ROW0_FROM_TOP + i * ROW_PITCH}
           circleScaleDur={CIRCLE_DUR}
           typeStartOffset={TYPE_OFFSET}
           typeDur={TYPE_DUR}
@@ -537,10 +603,10 @@ export const timeline5TilesDefaultProps: Timeline5TilesProps = {
     'Build the first version',
     'Ship and review',
   ],
-  anchor: { kind: 'icon', id: 'video-lecture' },
+  anchor: { kind: 'icon', id: 'arrows-infographics-elements-steps-light' },
 };
 
 export const timeline5TilesCharacterDemoProps: Timeline5TilesProps = {
   ...timeline5TilesDefaultProps,
-  anchor: { kind: 'character', id: 'presenter-red' },
+  anchor: { kind: 'character', id: 'male_middleage_white' },
 };
