@@ -16,8 +16,10 @@ import { z } from 'zod';
 //     (easeInOutCubic). The platinum-blue left half is part of the AbsoluteFill
 //     background — the BG asset is transparent on the left.
 //   • Two group titles fade + slide-up at 0.85 s. Left = #00B8EE, right = #FF3D8A.
-//   • 4 pills per side. Each pill scales 0 → 1 with easeOutBack from its centre
-//     over 0.75 s, staggered: row 0 at 1.40 s, row 1 at 2.40 s, etc.
+//   • 1–4 pills per side (independent counts). Each pill scales 0 → 1 with
+//     easeOutBack from its centre over 0.75 s, staggered: row 0 at 1.40 s,
+//     row 1 at 2.40 s, etc. Pills are top-aligned from row 0 — a side with
+//     fewer than 4 simply leaves the lower rows empty (no auto-centring).
 //   • Pill text fades in at startTime + 0.55 over 0.30 s.
 //   • Icons (optional) sit inside the pill's circle on the left edge.
 //   • Default composition length is 300 frames (10 s @ 30 fps).
@@ -31,16 +33,19 @@ import { z } from 'zod';
 const pillSchema = z.object({
   // Pill caption — Satoshi Medium (500) at 40 px. ≤22 chars to fit the pill body.
   text: z.string().min(1).max(22),
-  // Optional icon id from icons/ (e.g. "rocket"). Renders inside the circle
-  // at the pill's left edge. Skip if no icon — circle stays as-is per the asset.
+  // Optional Small-Icons id — resolves to small-icons/<id>.svg (the shared
+  // Small-Icons/ folder, pre-coloured white). E.g. "arrow-trend-up",
+  // "graduation-cap", "benefit-hand". Renders white inside the pill's circle
+  // (blue on the left, pink on the right). Omit to leave the circle plain.
   icon: z.string().min(1).optional(),
 });
 
 const sectionSchema = z.object({
   // Group title — Satoshi 900 at 58 px. ≤40 chars to keep on one line.
   title: z.string().min(1).max(40),
-  // Exactly 4 pills, top → bottom.
-  pills: z.array(pillSchema).length(4),
+  // 1 to 4 pills, top → bottom. Each side is independent (e.g. left 1, right 4).
+  // Pills are top-aligned from row 0; fewer than 4 leave the lower rows empty.
+  pills: z.array(pillSchema).min(1).max(4),
 });
 
 // Optional per-render timing overrides. All values in SECONDS.
@@ -50,7 +55,7 @@ export const splitscreenPointsV1TimingsSchema = z
     bgPanDuration: z.number().positive(),
     titleStart:    z.number().nonnegative(),
     titleDuration: z.number().positive(),
-    rowStarts:     z.array(z.number().nonnegative()).length(4),
+    rowStarts:     z.array(z.number().nonnegative()).min(1).max(4),
     pillScaleDuration: z.number().positive(),
     pillTextOffset: z.number().nonnegative(),
     pillTextDuration: z.number().positive(),
@@ -73,10 +78,13 @@ export const splitscreenPointsV1Meta = {
     'on the light right side, each with a title above. Pills pop in row-by-row.',
   authoringNotes:
     'left and right each take a title (Satoshi Black 58 px, ≤40 chars) and ' +
-    'exactly 4 pills (Satoshi Medium 40 px, ≤22 chars each). Use this template ' +
-    'when comparing two sets of 4 — pros vs cons, before vs after, etc. ' +
-    'Optional per-pill icon id sits inside the circle. Default duration ' +
-    '300 frames (10 s).',
+    '1 to 4 pills (Satoshi Medium 40 px, ≤22 chars each). The two sides are ' +
+    'independent — e.g. left 1 pill, right 4 — and pills are top-aligned from ' +
+    'the first row (fewer pills leave the lower rows empty). Use when comparing ' +
+    'two sets ' +
+    '(pros vs cons, before vs after, etc.). Optional per-pill icon is a ' +
+    'Small-Icons id (small-icons/<id>.svg, pre-coloured white) shown in the ' +
+    'circle. Default duration 300 frames (10 s).',
 } as const;
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -304,7 +312,7 @@ function AnimPill({
           }}
         >
           <Img
-            src={staticFile(`icons/${icon}.svg`)}
+            src={staticFile(`small-icons/${icon}.svg`)}
             alt=""
             style={{
               width:  CIRCLE_D * 0.58,
@@ -375,10 +383,14 @@ export const SplitscreenPointsV1: React.FC<SplitscreenPointsV1Props> = ({
   const BG_PAN_END       = BG_PAN_START + f(t.bgPanDuration);
   const TITLE_START      = f(t.titleStart);
   const TITLE_DUR        = f(t.titleDuration);
-  const ROW_STARTS       = t.rowStarts.map(f);
   const PILL_SCALE_DUR   = f(t.pillScaleDuration);
   const PILL_TEXT_OFFSET = f(t.pillTextOffset);
   const PILL_TEXT_DUR    = f(t.pillTextDuration);
+
+  // One start frame per pill row. Use the matching rowStarts entry when present,
+  // else the default cadence, else a 1 s/row fallback beyond the default list.
+  const rowStartF = (i: number) =>
+    f(t.rowStarts[i] ?? DEFAULT_TIMINGS.rowStarts[i] ?? 1.4 + i * 1.0);
 
   // BG pan-in — Oxford Blue half slides in from off-canvas right.
   const bgX = interpolate(frame, [BG_PAN_START, BG_PAN_END], [BG_PAN_TRAVEL, 0], {
@@ -427,32 +439,32 @@ export const SplitscreenPointsV1: React.FC<SplitscreenPointsV1Props> = ({
         titleDur={TITLE_DUR}
       />
 
-      {/* Left pills (rows 0–3) */}
-      {[0, 1, 2, 3].map(i => (
+      {/* Left pills (1–4, top-aligned from row 0) */}
+      {left.pills.map((pill, i) => (
         <AnimPill
           key={`l${i}`}
           frame={frame}
           side="left"
           rowIndex={i}
-          text={left.pills[i]!.text}
-          icon={left.pills[i]!.icon}
-          startFrame={ROW_STARTS[i]!}
+          text={pill.text}
+          icon={pill.icon}
+          startFrame={rowStartF(i)}
           scaleDur={PILL_SCALE_DUR}
           textOffset={PILL_TEXT_OFFSET}
           textDur={PILL_TEXT_DUR}
         />
       ))}
 
-      {/* Right pills (rows 0–3) */}
-      {[0, 1, 2, 3].map(i => (
+      {/* Right pills (1–4, top-aligned from row 0) */}
+      {right.pills.map((pill, i) => (
         <AnimPill
           key={`r${i}`}
           frame={frame}
           side="right"
           rowIndex={i}
-          text={right.pills[i]!.text}
-          icon={right.pills[i]!.icon}
-          startFrame={ROW_STARTS[i]!}
+          text={pill.text}
+          icon={pill.icon}
+          startFrame={rowStartF(i)}
           scaleDur={PILL_SCALE_DUR}
           textOffset={PILL_TEXT_OFFSET}
           textDur={PILL_TEXT_DUR}
